@@ -1,0 +1,1303 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cherry Rewards</title>
+
+<!-- Supabase JS Client -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<!-- QR Scanner -->
+<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<!-- MapLibre GL JS + OpenFreeMap -->
+<link href="https://unpkg.com/maplibre-gl/dist/maplibre-gl.css" rel="stylesheet"/>
+<script src="https://unpkg.com/maplibre-gl/dist/maplibre-gl.js"></script>
+<!-- QR Code Generator -->
+<script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+<!-- Google Fonts -->
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+
+<style>
+  :root {
+    --cherry: #C0152A;
+    --cherry-dark: #8B0D1E;
+    --cherry-light: #FF3355;
+    --sky: #5BB8F5;
+    --sky-light: #A8D8FA;
+    --cream: #FFF8F5;
+    --ink: #1A0A0E;
+    --muted: #7A6065;
+    --border: #EAD9DC;
+    --success: #22C55E;
+    --card-bg: #FFFFFF;
+    --bg: #FDF3F4;
+    --shadow: 0 4px 24px rgba(192,21,42,0.10);
+    --shadow-lg: 0 12px 48px rgba(192,21,42,0.16);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'DM Sans', sans-serif;
+    background: var(--bg);
+    color: var(--ink);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* ─── HEADER ─────────────────────────────────── */
+  header {
+    background: var(--card-bg);
+    border-bottom: 1px solid var(--border);
+    padding: 0 20px;
+    height: 62px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    box-shadow: 0 2px 12px rgba(192,21,42,0.07);
+  }
+
+  .logo {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    text-decoration: none;
+  }
+
+  .logo-mark svg { display: block; }
+
+  .logo-wordmark {
+    font-family: 'Playfair Display', serif;
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--cherry);
+    letter-spacing: -0.3px;
+  }
+
+  .header-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .btn-subscribe {
+    background: var(--cherry);
+    color: #fff;
+    border: none;
+    border-radius: 22px;
+    padding: 8px 18px;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    letter-spacing: 0.2px;
+    transition: background 0.18s, transform 0.12s;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .btn-subscribe:hover { background: var(--cherry-dark); transform: scale(1.03); }
+  .btn-subscribe svg { width: 14px; height: 14px; }
+
+  .btn-auth {
+    background: transparent;
+    color: var(--cherry);
+    border: 1.5px solid var(--cherry);
+    border-radius: 22px;
+    padding: 7px 16px;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.18s;
+  }
+  .btn-auth:hover { background: var(--cherry); color: #fff; }
+
+  /* ─── MAIN LAYOUT ─────────────────────────────── */
+  main {
+    max-width: 480px;
+    margin: 0 auto;
+    padding: 20px 16px 40px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+
+  /* ─── SCANNER VIEWPORT ────────────────────────── */
+  .scanner-section {
+    border-radius: 20px;
+    overflow: hidden;
+    position: relative;
+    background: #0A0205;
+    aspect-ratio: 4/3;
+    box-shadow: var(--shadow-lg);
+  }
+
+  .scanner-bg {
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(ellipse at center, #1a0410 0%, #050005 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .scanner-grid {
+    position: absolute;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(192,21,42,0.08) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(192,21,42,0.08) 1px, transparent 1px);
+    background-size: 28px 28px;
+  }
+
+  .scan-zone {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 200px;
+    height: 200px;
+  }
+
+  /* Corner brackets */
+  .bracket {
+    position: absolute;
+    width: 28px;
+    height: 28px;
+    border-color: #FF2244;
+    border-style: solid;
+    border-width: 0;
+    box-shadow: 0 0 12px rgba(255,34,68,0.8);
+  }
+  .bracket.tl { top: 0; left: 0; border-top-width: 3px; border-left-width: 3px; }
+  .bracket.tr { top: 0; right: 0; border-top-width: 3px; border-right-width: 3px; }
+  .bracket.bl { bottom: 0; left: 0; border-bottom-width: 3px; border-left-width: 3px; }
+  .bracket.br { bottom: 0; right: 0; border-bottom-width: 3px; border-right-width: 3px; }
+
+  /* Sweep line */
+  .sweep-line {
+    position: absolute;
+    left: 0; right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, #FF2244, #FF2244, transparent);
+    box-shadow: 0 0 10px 2px rgba(255,34,68,0.7);
+    animation: sweep 2.2s ease-in-out infinite;
+  }
+
+  @keyframes sweep {
+    0%   { top: 0; opacity: 0.6; }
+    50%  { top: calc(100% - 2px); opacity: 1; }
+    100% { top: 0; opacity: 0.6; }
+  }
+
+  /* Live indicator */
+  .live-indicator {
+    position: absolute;
+    bottom: 16px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    background: rgba(0,0,0,0.55);
+    border: 1px solid rgba(34,197,94,0.4);
+    border-radius: 20px;
+    padding: 5px 14px;
+  }
+
+  .live-dot {
+    width: 8px; height: 8px;
+    background: var(--success);
+    border-radius: 50%;
+    animation: pulse-green 1.4s ease-in-out infinite;
+  }
+
+  @keyframes pulse-green {
+    0%, 100% { opacity: 1; transform: scale(1); box-shadow: 0 0 0 0 rgba(34,197,94,0.7); }
+    50% { opacity: 0.85; transform: scale(1.1); box-shadow: 0 0 0 5px rgba(34,197,94,0); }
+  }
+
+  .live-text {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--success);
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+  }
+
+  /* QR Reader container (hidden until active) */
+  #qr-reader-container {
+    position: absolute;
+    inset: 0;
+    display: none;
+    z-index: 10;
+  }
+  #qr-reader { width: 100%; height: 100%; }
+  #qr-reader video { width: 100% !important; height: 100% !important; object-fit: cover; }
+  #qr-reader > * { border: none !important; }
+
+  /* ─── SCAN BUTTON ─────────────────────────────── */
+  .scan-btn {
+    width: 100%;
+    background: var(--cherry);
+    color: #fff;
+    border: none;
+    border-radius: 16px;
+    padding: 16px;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 16px;
+    font-weight: 700;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    letter-spacing: 0.2px;
+    box-shadow: 0 6px 20px rgba(192,21,42,0.35);
+    transition: all 0.18s;
+    position: relative;
+    overflow: hidden;
+  }
+  .scan-btn::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(135deg, rgba(255,255,255,0.1) 0%, transparent 60%);
+  }
+  .scan-btn:hover { background: var(--cherry-dark); transform: translateY(-1px); box-shadow: 0 10px 28px rgba(192,21,42,0.45); }
+  .scan-btn:active { transform: translateY(0); }
+  .scan-btn:disabled { opacity: 0.7; cursor: not-allowed; }
+
+  /* ─── REWARD CARD ─────────────────────────────── */
+  .reward-card {
+    background: var(--card-bg);
+    border-radius: 20px;
+    overflow: hidden;
+    box-shadow: var(--shadow);
+    border: 1px solid var(--border);
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    min-height: 160px;
+  }
+
+  .reward-left {
+    padding: 20px;
+    border-right: 1px dashed var(--border);
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    background: linear-gradient(135deg, #fff 0%, #FFF0F2 100%);
+  }
+
+  .reward-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    background: var(--cherry);
+    color: #fff;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    padding: 4px 10px;
+    border-radius: 20px;
+    width: fit-content;
+    margin-bottom: 8px;
+  }
+
+  .reward-title {
+    font-family: 'Playfair Display', serif;
+    font-size: 17px;
+    font-weight: 700;
+    color: var(--ink);
+    line-height: 1.3;
+    margin-bottom: 4px;
+  }
+
+  .reward-desc {
+    font-size: 12px;
+    color: var(--muted);
+    line-height: 1.5;
+  }
+
+  .reward-pts {
+    font-size: 28px;
+    font-weight: 700;
+    color: var(--cherry);
+    font-family: 'Playfair Display', serif;
+    line-height: 1;
+  }
+
+  .reward-pts-label {
+    font-size: 11px;
+    color: var(--muted);
+    font-weight: 500;
+  }
+
+  .reward-right {
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background: #fff;
+    gap: 10px;
+  }
+
+  #user-qr-canvas {
+    width: 120px !important;
+    height: 120px !important;
+    border-radius: 8px;
+  }
+
+  .qr-label {
+    font-size: 10px;
+    color: var(--muted);
+    text-align: center;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    font-weight: 600;
+  }
+
+  /* ─── MAP SECTION ─────────────────────────────── */
+  .map-section {
+    border-radius: 20px;
+    overflow: hidden;
+    box-shadow: var(--shadow);
+    border: 1px solid var(--border);
+  }
+
+  .map-header {
+    background: var(--card-bg);
+    padding: 14px 18px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .map-header-title {
+    font-family: 'Playfair Display', serif;
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--ink);
+  }
+
+  .map-header-sub {
+    font-size: 12px;
+    color: var(--muted);
+    margin-left: auto;
+  }
+
+  #map {
+    height: 320px;
+    width: 100%;
+  }
+
+  /* ─── AUTH MODAL ──────────────────────────────── */
+  .modal-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(10,2,5,0.6);
+    z-index: 200;
+    align-items: flex-end;
+    justify-content: center;
+    backdrop-filter: blur(4px);
+  }
+  .modal-overlay.active { display: flex; }
+
+  .modal {
+    background: var(--card-bg);
+    border-radius: 28px 28px 0 0;
+    padding: 32px 24px 40px;
+    width: 100%;
+    max-width: 480px;
+    animation: slideUp 0.28s cubic-bezier(0.34,1.56,0.64,1);
+  }
+
+  @keyframes slideUp {
+    from { transform: translateY(100%); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
+  }
+
+  .modal-handle {
+    width: 40px; height: 4px;
+    background: var(--border);
+    border-radius: 2px;
+    margin: 0 auto 24px;
+  }
+
+  .modal-title {
+    font-family: 'Playfair Display', serif;
+    font-size: 24px;
+    font-weight: 700;
+    color: var(--ink);
+    margin-bottom: 6px;
+  }
+
+  .modal-sub {
+    font-size: 13px;
+    color: var(--muted);
+    margin-bottom: 24px;
+  }
+
+  .modal-tabs {
+    display: flex;
+    gap: 0;
+    background: var(--bg);
+    border-radius: 12px;
+    padding: 4px;
+    margin-bottom: 24px;
+  }
+
+  .modal-tab {
+    flex: 1;
+    padding: 9px;
+    border: none;
+    background: transparent;
+    border-radius: 8px;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    color: var(--muted);
+    transition: all 0.18s;
+  }
+  .modal-tab.active {
+    background: var(--card-bg);
+    color: var(--cherry);
+    box-shadow: 0 2px 8px rgba(192,21,42,0.12);
+  }
+
+  .field {
+    margin-bottom: 16px;
+  }
+
+  .field label {
+    display: block;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    margin-bottom: 6px;
+  }
+
+  .field input {
+    width: 100%;
+    background: var(--bg);
+    border: 1.5px solid var(--border);
+    border-radius: 12px;
+    padding: 13px 15px;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 15px;
+    color: var(--ink);
+    outline: none;
+    transition: border-color 0.18s;
+  }
+  .field input:focus { border-color: var(--cherry); }
+
+  .btn-primary {
+    width: 100%;
+    background: var(--cherry);
+    color: #fff;
+    border: none;
+    border-radius: 14px;
+    padding: 15px;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 15px;
+    font-weight: 700;
+    cursor: pointer;
+    margin-top: 8px;
+    transition: all 0.18s;
+    box-shadow: 0 4px 16px rgba(192,21,42,0.3);
+  }
+  .btn-primary:hover { background: var(--cherry-dark); }
+
+  .modal-close {
+    position: absolute;
+    top: 18px;
+    right: 20px;
+    background: var(--bg);
+    border: none;
+    border-radius: 50%;
+    width: 34px; height: 34px;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer;
+    color: var(--muted);
+    font-size: 18px;
+    transition: background 0.15s;
+  }
+  .modal-close:hover { background: var(--border); }
+
+  .modal { position: relative; }
+
+  /* Toast */
+  .toast {
+    position: fixed;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%) translateY(20px);
+    background: var(--ink);
+    color: #fff;
+    padding: 12px 22px;
+    border-radius: 30px;
+    font-size: 13px;
+    font-weight: 500;
+    z-index: 999;
+    opacity: 0;
+    transition: all 0.3s;
+    white-space: nowrap;
+    pointer-events: none;
+  }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+  .toast.success { background: var(--success); }
+  .toast.error { background: var(--cherry); }
+
+  /* User info bar */
+  .user-bar {
+    display: none;
+    background: linear-gradient(135deg, var(--cherry) 0%, var(--cherry-dark) 100%);
+    border-radius: 14px;
+    padding: 14px 18px;
+    color: #fff;
+    align-items: center;
+    justify-content: space-between;
+    box-shadow: 0 4px 16px rgba(192,21,42,0.3);
+  }
+  .user-bar.visible { display: flex; }
+
+  .user-name {
+    font-family: 'Playfair Display', serif;
+    font-size: 16px;
+    font-weight: 700;
+  }
+
+  .user-email { font-size: 12px; opacity: 0.8; }
+
+  .btn-logout {
+    background: rgba(255,255,255,0.2);
+    border: 1px solid rgba(255,255,255,0.3);
+    color: #fff;
+    padding: 6px 14px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+  .btn-logout:hover { background: rgba(255,255,255,0.3); }
+
+  /* Section labels */
+  .section-label {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: -8px;
+    padding-left: 4px;
+  }
+
+  /* Scan result overlay */
+  .scan-result {
+    display: none;
+    position: absolute;
+    inset: 0;
+    background: rgba(10,2,5,0.85);
+    z-index: 20;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    gap: 12px;
+    border-radius: 20px;
+  }
+  .scan-result.show { display: flex; }
+  .scan-result-icon { font-size: 48px; }
+  .scan-result-text { color: #fff; font-size: 15px; font-weight: 600; text-align: center; padding: 0 20px; }
+</style>
+</head>
+<body>
+
+<!-- ═══ HEADER ═══════════════════════════════════ -->
+<header>
+  <a class="logo" href="#">
+    <div class="logo-mark">
+      <!-- Cherry SVG mark: 3 overlapping circles + stem -->
+      <svg width="36" height="36" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <!-- Stem -->
+        <path d="M18 10 Q22 4 26 6" stroke="#C0152A" stroke-width="1.8" stroke-linecap="round" fill="none"/>
+        <!-- Left cherry -->
+        <circle cx="12" cy="22" r="7" fill="#C0152A" opacity="0.85"/>
+        <!-- Right cherry -->
+        <circle cx="22" cy="22" r="7" fill="#C0152A"/>
+        <!-- Highlight overlaps -->
+        <circle cx="12" cy="22" r="7" fill="none" stroke="#fff" stroke-width="0.8" opacity="0.3"/>
+        <circle cx="22" cy="22" r="7" fill="none" stroke="#fff" stroke-width="0.8" opacity="0.3"/>
+        <!-- Shine dots -->
+        <circle cx="10" cy="19" r="1.8" fill="rgba(255,255,255,0.5)"/>
+        <circle cx="20" cy="19" r="1.8" fill="rgba(255,255,255,0.5)"/>
+      </svg>
+    </div>
+    <span class="logo-wordmark">Cherry</span>
+  </a>
+
+  <div class="header-actions">
+    <button class="btn-auth" id="btn-open-auth">Sign in</button>
+    <a href="https://cherry.com/subscribe" target="_blank" rel="noopener" class="btn-subscribe">
+      <svg viewBox="0 0 16 16" fill="none"><path d="M2 8l4 4 8-8" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      Subscribe
+    </a>
+  </div>
+</header>
+
+<!-- ═══ MAIN ══════════════════════════════════════ -->
+<main>
+
+  <!-- User bar (shown when logged in) -->
+  <div class="user-bar" id="user-bar">
+    <div>
+      <div class="user-name" id="user-display-name">Member</div>
+      <div class="user-email" id="user-display-email"></div>
+    </div>
+    <button class="btn-logout" id="btn-logout">Log out</button>
+  </div>
+
+  <!-- ── SCANNER ───────────────────────────────── -->
+  <div class="section-label">Scan & Earn</div>
+
+  <div class="scanner-section" id="scanner-section">
+    <div class="scanner-bg">
+      <div class="scanner-grid"></div>
+    </div>
+    <div class="scan-zone">
+      <div class="bracket tl"></div>
+      <div class="bracket tr"></div>
+      <div class="bracket bl"></div>
+      <div class="bracket br"></div>
+      <div class="sweep-line"></div>
+    </div>
+    <div class="live-indicator">
+      <div class="live-dot"></div>
+      <span class="live-text">Live</span>
+    </div>
+    <!-- QR Reader injected here -->
+    <div id="qr-reader-container">
+      <div id="qr-reader"></div>
+    </div>
+    <!-- Scan result overlay -->
+    <div class="scan-result" id="scan-result">
+      <div class="scan-result-icon" id="scan-result-icon">✅</div>
+      <div class="scan-result-text" id="scan-result-text">QR Code validated!</div>
+      <button class="btn-auth" style="background:#fff;color:var(--cherry);border-color:#fff;" onclick="closeScanResult()">Dismiss</button>
+    </div>
+  </div>
+
+  <button class="scan-btn" id="scan-btn" onclick="startScan()">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+      <rect x="3" y="3" width="5" height="5"/><rect x="16" y="3" width="5" height="5"/>
+      <rect x="3" y="16" width="5" height="5"/>
+      <line x1="21" y1="12" x2="21" y2="21"/><line x1="12" y1="3" x2="12" y2="12"/>
+      <line x1="12" y1="16" x2="12" y2="21"/><line x1="16" y1="12" x2="21" y2="12"/>
+    </svg>
+    Scan Reward Code
+  </button>
+
+  <!-- ── REWARD + QR CARD ───────────────────────── -->
+  <div class="section-label">Your Rewards</div>
+
+  <div class="reward-card" id="reward-card">
+    <div class="reward-left">
+      <div>
+        <div class="reward-badge">
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+          Active
+        </div>
+        <div class="reward-title" id="reward-title">Welcome Reward</div>
+        <div class="reward-desc" id="reward-desc">Sign in to unlock your rewards and start earning points at Cherry stores.</div>
+      </div>
+      <div>
+        <div class="reward-pts" id="reward-pts">–</div>
+        <div class="reward-pts-label">points balance</div>
+      </div>
+    </div>
+    <div class="reward-right">
+      <canvas id="user-qr-canvas" width="120" height="120"></canvas>
+      <div class="qr-label">Member QR</div>
+    </div>
+  </div>
+
+  <!-- ── MAP ───────────────────────────────────── -->
+  <div class="section-label">Nearby Stores</div>
+
+  <div class="map-section">
+    <div class="map-header">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--cherry)" stroke-width="2.2"><path d="M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg>
+      <span class="map-header-title">Cherry Stores</span>
+      <span class="map-header-sub" id="map-sub">within 8 km</span>
+    </div>
+    <div id="map"></div>
+  </div>
+
+</main>
+
+<!-- ═══ AUTH MODAL ════════════════════════════════ -->
+<div class="modal-overlay" id="auth-modal">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <button class="modal-close" onclick="closeAuthModal()">✕</button>
+    <div class="modal-title">Welcome back</div>
+    <div class="modal-sub">Sign in or create your Cherry account</div>
+
+    <div class="modal-tabs">
+      <button class="modal-tab active" id="tab-signin" onclick="switchTab('signin')">Sign In</button>
+      <button class="modal-tab" id="tab-signup" onclick="switchTab('signup')">Sign Up</button>
+    </div>
+
+    <div id="form-signin">
+      <div class="field">
+        <label>Email</label>
+        <input type="email" id="signin-email" placeholder="you@example.com" autocomplete="email">
+      </div>
+      <div class="field">
+        <label>PIN</label>
+        <input type="password" id="signin-pin" placeholder="••••" maxlength="6" inputmode="numeric">
+      </div>
+      <button class="btn-primary" onclick="handleSignIn()">Sign In</button>
+    </div>
+
+    <div id="form-signup" style="display:none">
+      <div class="field">
+        <label>Full Name</label>
+        <input type="text" id="signup-name" placeholder="Your name">
+      </div>
+      <div class="field">
+        <label>Email</label>
+        <input type="email" id="signup-email" placeholder="you@example.com" autocomplete="email">
+      </div>
+      <div class="field">
+        <label>PIN (4–6 digits)</label>
+        <input type="password" id="signup-pin" placeholder="••••" maxlength="6" inputmode="numeric">
+      </div>
+      <button class="btn-primary" onclick="handleSignUp()">Create Account</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<!-- ═══════════════════════════════════════════════
+     BACKEND SCRIPT — All DB interactions happen here
+     Using Supabase (free PostgreSQL + REST API)
+
+     ┌─ SETUP INSTRUCTIONS ──────────────────────────
+     │ 1. Go to https://supabase.com → New project
+     │ 2. Run the SQL in the <setup-sql> comment below
+     │ 3. Replace SUPABASE_URL + SUPABASE_ANON_KEY below
+     │ 4. In Supabase dashboard → Authentication → Settings
+     │    disable "Email confirmations" for easy testing
+       5.
+       cherry_db
+       DB password - tSqOopne42OR0XtG
+       URL  https://fwokjassyjtvqwihrgzi.supabase.co
+       KEY - sb_publishable_SkXSZbWP5WZ-2-pwl9b1FA_Znct4zoN
+     └───────────────────────────────────────────────
+
+     SETUP SQL (run in Supabase SQL Editor):
+     ─────────────────────────────────────────
+     CREATE TABLE cherry_db (
+       ID             INTEGER PRIMARY KEY,
+       USERID         TEXT UNIQUE NOT NULL,
+       EMAIL          TEXT UNIQUE NOT NULL,
+       PWD            TEXT NOT NULL,
+       POINTS         INT DEFAULT 0,
+       DATA1          TEXT,
+       DATA2          TEXT,
+       FUND1          REAL DEFAULT 0,
+       FUND2          REAL DEFAULT 0,
+       FUND3          REAL DEFAULT 0,
+       BANK_AC        INTEGER,
+       BANK_NAME      TEXT,
+       BANK_AC_HOLDER TEXT
+     );
+
+     CREATE TABLE stores (
+       id      bigint generated always as identity primary key,
+       name    TEXT NOT NULL,
+       lat     FLOAT NOT NULL,
+       lng     FLOAT NOT NULL,
+       address TEXT,
+       open    BOOLEAN DEFAULT TRUE
+     );
+
+     -- RLS policies
+     ALTER TABLE cherry_db ENABLE ROW LEVEL SECURITY;
+     ALTER TABLE stores ENABLE ROW LEVEL SECURITY;
+     CREATE POLICY "stores_public_read"   ON stores    FOR SELECT USING (true);
+     CREATE POLICY "cherry_db_own_read"   ON cherry_db FOR SELECT USING (USERID = current_setting('app.current_user_id', true));
+     CREATE POLICY "cherry_db_own_update" ON cherry_db FOR UPDATE USING (USERID = current_setting('app.current_user_id', true));
+     CREATE POLICY "cherry_db_insert"     ON cherry_db FOR INSERT WITH CHECK (true);
+
+     -- Sample stores (replace with real coordinates)
+     INSERT INTO stores (name, lat, lng, address) VALUES
+       ('Cherry Central',   -36.8485, 174.7633, '123 Queen St, Auckland'),
+       ('Cherry Newmarket', -36.8710, 174.7769, '45 Broadway, Newmarket'),
+       ('Cherry Ponsonby',  -36.8563, 174.7452, '189 Ponsonby Rd'),
+       ('Cherry Takapuna',  -36.7877, 174.7712, '12 Hurstmere Rd, Takapuna'),
+       ('Cherry Botany',    -36.9146, 174.9129, '588 Chapel Rd, Botany');
+     -- DATA1=reward title, DATA2=reward description, FUND1/2/3=financial fields
+     ─────────────────────────────────────────
+════════════════════════════════════════════════ -->
+
+<script>
+// ═══ CONFIGURATION ═══════════════════════════════
+// Replace with your Supabase project URL and anon key
+//const SUPABASE_URL = 'https://YOUR_PROJECT.supabase.co';
+//const SUPABASE_ANON_KEY = 'YOUR_ANON_KEY_HERE';
+const SUPABSE_URL = 'https://fwokjassyjtvqwihrgzi.supabase.co';
+const SUPABASE_ANON_KEY = 'sb_publishable_SkXSZbWP5WZ-2-pwl9b1FA_Znct4zoN';
+
+// ═══ INIT SUPABASE ════════════════════════════════
+const { createClient } = supabase;
+const db = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+// ═══ STATE ════════════════════════════════════════
+let currentUser = null;   // holds the full cherry_db row
+let html5QrCode = null;
+let leafletMap = null;
+
+// ═══ TOAST ════════════════════════════════════════
+function showToast(msg, type = '') {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast show ' + type;
+  setTimeout(() => t.className = 'toast', 3000);
+}
+
+// ═══ AUTH MODAL ═══════════════════════════════════
+document.getElementById('btn-open-auth').addEventListener('click', () => {
+  if (currentUser) { showToast('Already signed in as ' + currentUser.EMAIL); return; }
+  document.getElementById('auth-modal').classList.add('active');
+});
+
+function closeAuthModal() {
+  document.getElementById('auth-modal').classList.remove('active');
+}
+
+document.getElementById('auth-modal').addEventListener('click', function(e) {
+  if (e.target === this) closeAuthModal();
+});
+
+function switchTab(tab) {
+  document.getElementById('tab-signin').classList.toggle('active', tab === 'signin');
+  document.getElementById('tab-signup').classList.toggle('active', tab === 'signup');
+  document.getElementById('form-signin').style.display = tab === 'signin' ? '' : 'none';
+  document.getElementById('form-signup').style.display = tab === 'signup' ? '' : 'none';
+}
+
+// ═══ SIGN IN ══════════════════════════════════════
+// Queries cherry_db matching EMAIL + PWD (plain PIN)
+async function handleSignIn() {
+  const email = document.getElementById('signin-email').value.trim().toLowerCase();
+  const pin   = document.getElementById('signin-pin').value.trim();
+
+  if (!email || !pin) { showToast('Please fill in all fields', 'error'); return; }
+
+  const { data, error } = await db
+    .from('cherry_db')
+    .select('*')
+    .eq('EMAIL', email)
+    .eq('PWD', pin)
+    .single();
+
+  if (error || !data) {
+    showToast('Invalid email or PIN', 'error');
+    return;
+  }
+
+  loginUser(data);
+  closeAuthModal();
+  showToast('Welcome back! 🍒', 'success');
+}
+
+// ═══ SIGN UP ══════════════════════════════════════
+// Inserts a new row into cherry_db
+async function handleSignUp() {
+  const name  = document.getElementById('signup-name').value.trim();
+  const email = document.getElementById('signup-email').value.trim().toLowerCase();
+  const pin   = document.getElementById('signup-pin').value.trim();
+
+  if (!email || !pin) { showToast('Email and PIN are required', 'error'); return; }
+  if (pin.length < 4)  { showToast('PIN must be at least 4 digits', 'error'); return; }
+
+  // Generate a unique USERID (UUID-style)
+  //const userid = crypto.randomUUID ? crypto.randomUUID()
+  //             : Date.now().toString(36) + Math.random().toString(36).slice(2);
+  const userid = generateRandom();
+
+  const id_text = userid.slice(4,8);
+  const id_int = parseInt(id_text, 10);
+
+  const { data, error } = await db
+    .from('cherry_db')
+    .insert({
+      ID:             id_int,
+      USERID:         userid,
+      EMAIL:          email,
+      PWD:            pin,
+      POINTS:         0,
+      DATA1:          0,
+      DATA2:          0,
+      FUND1:          0,
+      FUND2:          0,
+      FUND3:          0,
+      BANK_AC:        null,
+      BANK_NAME:      null,
+      BANK_AC_HOLDER: null,
+    })
+    .select()
+    .single();
+
+  if (error) {
+    if (error.code === '23505') {
+      showToast('Email already registered. Sign in instead.', 'error');
+    } else {
+      showToast('Sign up failed: ' + error.message, 'error');
+    }
+    return;
+  }
+
+  loginUser(data);
+  closeAuthModal();
+  showToast('Account created! Welcome to Cherry 🍒', 'success');
+}
+//------ Generate userid ------
+
+function generateRandom() {
+  const upper = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+  const lower = 'abcdefghijklmnopqrstuvwxyz';
+  const digits = '0123456789';
+
+  const rand = (str, n) =>
+    Array.from({length: n}, () => str[Math.floor(Math.random() * str.length)]).join('');
+
+  const part1Capital  = rand(upper, 1);  // 1 capital letter
+  const part2Smalls   = rand(lower, 3);  // 3 small letters
+  const part3Numbers  = rand(digits, 4); // 4 numbers
+  const part4Smalls   = rand(lower, 5);  // 5 small letters
+  const part5Capitals = rand(upper, 2);  // 2 capital letters
+
+  return part1Capital + part2Smalls + part3Numbers + part4Smalls + part5Capitals;
+}
+
+// ═══ LOGIN USER ═══════════════════════════════════
+function loginUser(user) {
+  currentUser = user;
+  // Persist session by USERID
+  localStorage.setItem('cherry_userid', user.USERID);
+
+  // Header button → show name or email prefix
+  const displayName = user.EMAIL || user.EMAIL.split('@')[0];
+  document.getElementById('btn-open-auth').textContent = displayName;
+
+  // User bar
+  document.getElementById('user-bar').classList.add('visible');
+  document.getElementById('user-display-name').textContent = displayName;
+  document.getElementById('user-display-email').textContent = user.EMAIL;
+
+  // Reward card — DATA1=reward_points, DATA2=description
+  document.getElementById('reward-pts').textContent  = user.DATA1 ?? 0;
+  document.getElementById('reward-title').textContent = user.EMAIL || 'Cherry Member';
+  document.getElementById('reward-desc').textContent  = user.DATA2 || 'Scan in-store QR codes to earn points on every visit.';
+
+  // Member QR code — encodes the USERID
+  generateMemberQR(user.USERID);
+}
+
+// ═══ LOGOUT ═══════════════════════════════════════
+document.getElementById('btn-logout').addEventListener('click', () => {
+  currentUser = null;
+  localStorage.removeItem('cherry_userid');
+  document.getElementById('user-bar').classList.remove('visible');
+  document.getElementById('btn-open-auth').textContent = 'Sign in';
+  document.getElementById('reward-pts').textContent    = '–';
+  document.getElementById('reward-title').textContent  = 'Welcome Reward';
+  document.getElementById('reward-desc').textContent   = 'Sign in to unlock your rewards and start earning.';
+  showToast('Signed out');
+  const ctx = document.getElementById('user-qr-canvas').getContext('2d');
+  ctx.clearRect(0, 0, 120, 120);
+});
+
+// ═══ GENERATE MEMBER QR CODE ══════════════════════
+function generateMemberQR(userid) {
+  const canvas = document.getElementById('user-qr-canvas');
+  QRCode.toCanvas(canvas, userid, {
+    width: 120,
+    margin: 1,
+    color: { dark: '#C0152A', light: '#A8D8FA' },
+  }, err => { if (err) console.warn('QR gen error:', err); });
+}
+
+// ═══ QR SCANNER ═══════════════════════════════════
+// Scanned QR value is treated as a USERID to look up
+// and award points — or as a reward code in DATA2 format.
+// Adjust the lookup logic below to match your QR format.
+async function startScan() {
+  const btn = document.getElementById('scan-btn');
+  btn.textContent = 'Camera opening…';
+  btn.disabled = true;
+
+  const container = document.getElementById('qr-reader-container');
+  container.style.display = 'block';
+
+  try {
+    if (!html5QrCode) html5QrCode = new Html5Qrcode('qr-reader');
+
+    await html5QrCode.start(
+      { facingMode: 'environment' },
+      { fps: 10, qrbox: { width: 200, height: 200 } },
+      onQRCodeScanned,
+      () => {}
+    );
+
+    btn.textContent = '⏹ Stop Scanning';
+    btn.disabled = false;
+    btn.onclick = stopScan;
+
+  } catch (err) {
+    console.error('Camera error:', err);
+    showToast('Camera access denied or unavailable', 'error');
+    container.style.display = 'none';
+    btn.textContent = 'Scan Reward Code';
+    btn.disabled = false;
+    btn.onclick = startScan;
+  }
+}
+
+function stopScan() {
+  if (html5QrCode) {
+    html5QrCode.stop().then(() => {
+      document.getElementById('qr-reader-container').style.display = 'none';
+      const btn = document.getElementById('scan-btn');
+      btn.innerHTML = `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="5" height="5"/><rect x="16" y="3" width="5" height="5"/><rect x="3" y="16" width="5" height="5"/><line x1="21" y1="12" x2="21" y2="21"/><line x1="12" y1="3" x2="12" y2="12"/><line x1="12" y1="16" x2="12" y2="21"/><line x1="16" y1="12" x2="21" y2="12"/></svg> Scan Reward Code`;
+      btn.disabled = false;
+      btn.onclick = startScan;
+    });
+  }
+}
+
+async function onQRCodeScanned(decodedText) {
+  await stopScanSilent();
+
+  const resultEl = document.getElementById('scan-result');
+  const iconEl   = document.getElementById('scan-result-icon');
+  const textEl   = document.getElementById('scan-result-text');
+
+  // Look up scanned USERID in cherry_db
+  const { data: scannedUser, error } = await db
+    .from('cherry_db')
+    .select('USERID, EMAIL, POINTS, DATA1')
+    .eq('USERID', decodedText)
+    .single();
+
+  if (error || !scannedUser) {
+    iconEl.textContent = '❌';
+    textEl.textContent = 'QR code not recognised. Please try again.';
+    resultEl.classList.add('show');
+    return;
+  }
+
+  // If staff is logged in they can award points; otherwise show member info
+  if (!currentUser) {
+    iconEl.textContent = '🔐';
+    textEl.textContent = 'Member found: ' + (scannedUser.DATA1 || scannedUser.EMAIL) + '. Sign in to award points.';
+    resultEl.classList.add('show');
+    return;
+  }
+
+  // Award 50 points to scanned member
+  const FUND1_AWARD = 50;
+  const newPoints = (scannedUser.FUND1 || 0) + FUND1_AWARD;
+
+  await db
+    .from('cherry_db')
+    .update({ FUND1: newPoints })
+    .eq('USERID', scannedUser.USERID);
+
+  // If the currently logged-in user scanned their own QR, update UI
+  if (currentUser.USERID === scannedUser.USERID) {
+    currentUser.FUND1 = newPoints;
+    document.getElementById('reward-pts').textContent = newPoints;
+  }
+
+  iconEl.textContent = '🍒';
+  textEl.textContent = `+${FUND1_AWARD} pts awarded to ${scannedUser.USERID || scannedUser.EMAIL}. New balance: ${newPoints}`;
+  resultEl.classList.add('show');
+}
+
+async function stopScanSilent() {
+  if (html5QrCode) {
+    try { await html5QrCode.stop(); } catch(e) {}
+    document.getElementById('qr-reader-container').style.display = 'none';
+    const btn = document.getElementById('scan-btn');
+    btn.innerHTML = `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="5" height="5"/><rect x="16" y="3" width="5" height="5"/><rect x="3" y="16" width="5" height="5"/><line x1="21" y1="12" x2="21" y2="21"/><line x1="12" y1="3" x2="12" y2="12"/><line x1="12" y1="16" x2="12" y2="21"/><line x1="16" y1="12" x2="21" y2="12"/></svg> Scan Reward Code`;
+    btn.disabled = false;
+    btn.onclick = startScan;
+  }
+}
+
+function closeScanResult() {
+  document.getElementById('scan-result').classList.remove('show');
+  if (!currentUser) {
+    document.getElementById('auth-modal').classList.add('active');
+  }
+}
+
+// ═══ MAP (MapLibre GL + OpenFreeMap) ══════════════
+function initMap(lat, lng) {
+  if (leafletMap) { leafletMap.remove(); leafletMap = null; }
+
+  leafletMap = new maplibregl.Map({
+    container: 'map',
+    style: 'https://tiles.openfreemap.org/styles/liberty',
+    center: [lng, lat],   // MapLibre uses [lng, lat]
+    zoom: 13,
+    attributionControl: true,
+  });
+
+  leafletMap.addControl(new maplibregl.NavigationControl(), 'top-right');
+
+  // User location pulse marker
+  const userEl = document.createElement('div');
+  userEl.innerHTML = `
+    <div style="position:relative;width:20px;height:20px;">
+      <div style="position:absolute;inset:0;background:rgba(192,21,42,0.25);border-radius:50%;animation:map-pulse 1.8s ease-out infinite;"></div>
+      <div style="position:absolute;top:3px;left:3px;width:14px;height:14px;background:#C0152A;border:2.5px solid #fff;border-radius:50%;box-shadow:0 2px 8px rgba(192,21,42,0.6);"></div>
+    </div>`;
+  new maplibregl.Marker({ element: userEl })
+    .setLngLat([lng, lat])
+    .setPopup(new maplibregl.Popup({ offset: 14 }).setHTML('<b style="font-family:DM Sans,sans-serif">You are here</b>'))
+    .addTo(leafletMap);
+
+  leafletMap.on('load', () => loadStoreMarkers(lat, lng));
+}
+
+async function loadStoreMarkers(userLat, userLng) {
+  const { data: stores, error } = await db.from('stores').select('*');
+
+  if (error || !stores) {
+    showToast('Could not load store locations', 'error');
+    return;
+  }
+
+  // Haversine filter — 8 km radius
+  const R = 6371;
+  const withinRadius = stores.filter(store => {
+    const dLat = (store.lat - userLat) * Math.PI / 180;
+    const dLng = (store.lng - userLng) * Math.PI / 180;
+    const a = Math.sin(dLat/2)**2 +
+              Math.cos(userLat * Math.PI/180) * Math.cos(store.lat * Math.PI/180) *
+              Math.sin(dLng/2)**2;
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)) <= 8;
+  });
+
+  document.getElementById('map-sub').textContent =
+    `${withinRadius.length} store${withinRadius.length !== 1 ? 's' : ''} within 8 km`;
+
+  withinRadius.forEach(store => {
+    // Custom cherry marker element
+    const el = document.createElement('div');
+    el.title = store.name;
+    el.innerHTML = `<div style="width:32px;height:32px;background:#C0152A;border:2.5px solid #fff;border-radius:50%;display:flex;align-items:center;justify-content:center;box-shadow:0 3px 12px rgba(192,21,42,0.55);font-size:16px;cursor:pointer;transition:transform 0.15s;">🍒</div>`;
+    el.addEventListener('mouseenter', () => el.firstElementChild.style.transform = 'scale(1.2)');
+    el.addEventListener('mouseleave', () => el.firstElementChild.style.transform = 'scale(1)');
+
+    const popup = new maplibregl.Popup({ offset: 18, closeButton: false })
+      .setHTML(`
+        <div style="font-family:'DM Sans',sans-serif;min-width:160px;padding:2px 0;">
+          <div style="font-weight:700;font-size:14px;margin-bottom:3px;">${store.name}</div>
+          <div style="font-size:12px;color:#7A6065;">${store.address || ''}</div>
+          <div style="margin-top:6px;font-size:11px;font-weight:600;color:${store.open ? '#22C55E' : '#C0152A'};">
+            ${store.open ? '● Open now' : '● Closed'}
+          </div>
+        </div>`);
+
+    new maplibregl.Marker({ element: el })
+      .setLngLat([store.lng, store.lat])
+      .setPopup(popup)
+      .addTo(leafletMap);
+
+    // Show popup on hover
+    el.addEventListener('mouseenter', () => {
+      const marker = leafletMap._markers?.find(m => m.getLngLat().lng === store.lng);
+    });
+  });
+}
+
+// Request GPS permission and init map
+function requestLocationAndInitMap() {
+  if (!navigator.geolocation) {
+    // Fallback to Auckland CBD
+    initMap(-36.8485, 174.7633);
+    showToast('Geolocation not supported — showing Auckland');
+    return;
+  }
+
+  navigator.geolocation.getCurrentPosition(
+    pos => initMap(pos.coords.latitude, pos.coords.longitude),
+    err => {
+      console.warn('Location denied:', err);
+      initMap(-36.8485, 174.7633); // Auckland fallback
+      showToast('Location access denied — showing Auckland CBD');
+    },
+    { timeout: 8000, enableHighAccuracy: false }
+  );
+}
+
+// ═══ SESSION RESTORE ══════════════════════════════
+async function restoreSession() {
+  const savedUserId = localStorage.getItem('cherry_userid');
+  if (!savedUserId) return;
+
+  const { data, error } = await db
+    .from('cherry_db')
+    .select('*')
+    .eq('USERID', savedUserId)
+    .single();
+
+  if (data) loginUser(data);
+}
+
+// ═══ INIT ═════════════════════════════════════════
+document.addEventListener('DOMContentLoaded', async () => {
+  await restoreSession();
+  requestLocationAndInitMap();
+});
+</script>
+
+<!-- MapLibre popup + cherry marker styles -->
+<style>
+@keyframes map-pulse {
+  0%   { transform: scale(1); opacity: 0.7; }
+  100% { transform: scale(2.8); opacity: 0; }
+}
+.maplibregl-popup-content {
+  border-radius: 14px !important;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.13) !important;
+  border: 1px solid #EAD9DC !important;
+  padding: 12px 16px !important;
+  font-family: 'DM Sans', sans-serif !important;
+}
+.maplibregl-popup-tip { display: none !important; }
+.maplibregl-ctrl-attrib { font-size: 10px !important; }
+</style>
+
+</body>
+</html>
