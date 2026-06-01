@@ -729,7 +729,7 @@
     </div>
     <div class="reward-right">
       <canvas id="user-qr-canvas" width="120" height="120"></canvas>
-      <div class="qr-label">Member QR</div>
+      <div class="qr-label" id="qr-label">Member QR</div>
     </div>
   </div>
 
@@ -1019,7 +1019,10 @@ function loginUser(user) {
   document.getElementById('reward-desc').textContent  = user.DATA2 || 'Scan in-store QR codes to earn points on every visit.';
 
   // Member QR code — encodes the USERID
-  generateMemberQR(user.USERID);
+  const emailName = user.EMAIL.split('@')[0];
+  const qrValue = user.USERID + '@' + emailName;
+  generateMemberQR(qrValue);
+  document.getElementById('qr-label').textContent = qrValue;
 }
 
 // ═══ LOGOUT ═══════════════════════════════════════
@@ -1031,6 +1034,7 @@ document.getElementById('btn-logout').addEventListener('click', () => {
   document.getElementById('reward-pts').textContent    = '–';
   document.getElementById('reward-title').textContent  = 'Welcome Reward';
   document.getElementById('reward-desc').textContent   = 'Sign in to unlock your rewards and start earning.';
+  document.getElementById('qr-label').textContent = 'Member QR';
   showToast('Signed out');
   const ctx = document.getElementById('user-qr-canvas').getContext('2d');
   ctx.clearRect(0, 0, 120, 120);
