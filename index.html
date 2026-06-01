@@ -859,9 +859,10 @@
 <script>
 // ═══ CONFIGURATION ═══════════════════════════════
 // Replace with your Supabase project URL and anon key
-//const SUPABASE_URL = 'https://YOUR_PROJECT.supabase.co';
-//const SUPABASE_ANON_KEY = 'YOUR_ANON_KEY_HERE';
-const SUPABSE_URL = 'https://fwokjassyjtvqwihrgzi.supabase.co';
+//const SUPABASE_URL = 'https://YOUR_PROJECT.supabase.co'
+//const SUPABASE_ANON_KEY = 'YOUR_ANON_KEY_HERE'
+
+const SUPABASE_URL = 'https://fwokjassyjtvqwihrgzi.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_SkXSZbWP5WZ-2-pwl9b1FA_Znct4zoN';
 
 // ═══ INIT SUPABASE ════════════════════════════════
@@ -1004,7 +1005,7 @@ function loginUser(user) {
   localStorage.setItem('cherry_userid', user.USERID);
 
   // Header button → show name or email prefix
-  const displayName = user.EMAIL || user.EMAIL.split('@')[0];
+  const displayName = user.EMAIL.split('@')[0];
   document.getElementById('btn-open-auth').textContent = displayName;
 
   // User bar
@@ -1013,7 +1014,7 @@ function loginUser(user) {
   document.getElementById('user-display-email').textContent = user.EMAIL;
 
   // Reward card — DATA1=reward_points, DATA2=description
-  document.getElementById('reward-pts').textContent  = user.DATA1 ?? 0;
+  document.getElementById('reward-pts').textContent  = user.FUND1 ?? 0;
   document.getElementById('reward-title').textContent = user.EMAIL || 'Cherry Member';
   document.getElementById('reward-desc').textContent  = user.DATA2 || 'Scan in-store QR codes to earn points on every visit.';
 
