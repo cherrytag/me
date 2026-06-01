@@ -815,8 +815,8 @@
      CREATE TABLE cherry_db (
        ID             INTEGER PRIMARY KEY,
        USERID         TEXT UNIQUE NOT NULL,
-       EMAIL          TEXT UNIQUE NOT NULL,
-       PWD            TEXT NOT NULL,
+       email          TEXT UNIQUE NOT NULL,
+       pwd            TEXT NOT NULL,
        POINTS         INT DEFAULT 0,
        DATA1          TEXT,
        DATA2          TEXT,
@@ -884,7 +884,7 @@ function showToast(msg, type = '') {
 
 // ═══ AUTH MODAL ═══════════════════════════════════
 document.getElementById('btn-open-auth').addEventListener('click', () => {
-  if (currentUser) { showToast('Already signed in as ' + currentUser.EMAIL); return; }
+  if (currentUser) { showToast('Already signed in as ' + currentUser.email); return; }
   document.getElementById('auth-modal').classList.add('active');
 });
 
@@ -904,7 +904,7 @@ function switchTab(tab) {
 }
 
 // ═══ SIGN IN ══════════════════════════════════════
-// Queries cherry_db matching EMAIL + PWD (plain PIN)
+// Queries cherry_db matching email + pwd (plain PIN)
 async function handleSignIn() {
   const email = document.getElementById('signin-email').value.trim().toLowerCase();
   const pin   = document.getElementById('signin-pin').value.trim();
@@ -914,8 +914,8 @@ async function handleSignIn() {
   const { data, error } = await db
     .from('cherry_db')
     .select('*')
-    .eq('EMAIL', email)
-    .eq('PWD', pin)
+    .eq('email', email)
+    .eq('pwd', pin)
     .single();
 
   if (error || !data) {
@@ -984,7 +984,7 @@ async function handleSignUp() {
 function generateRandom() {
   const upper = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
   const lower = 'abcdefghijklmnopqrstuvwxyz';
-  const digits = '0123456789';
+  const digits = '123456789';
 
   const rand = (str, n) =>
     Array.from({length: n}, () => str[Math.floor(Math.random() * str.length)]).join('');
@@ -1001,26 +1001,26 @@ function generateRandom() {
 // ═══ LOGIN USER ═══════════════════════════════════
 function loginUser(user) {
   currentUser = user;
-  // Persist session by USERID
-  localStorage.setItem('cherry_userid', user.USERID);
+  // Persist session by userid
+  localStorage.setItem('cherry_userid', user.userid);
 
   // Header button → show name or email prefix
-  const displayName = user.EMAIL.split('@')[0];
+  const displayName = user.email.split('@')[0];
   document.getElementById('btn-open-auth').textContent = displayName;
 
   // User bar
   document.getElementById('user-bar').classList.add('visible');
   document.getElementById('user-display-name').textContent = displayName;
-  document.getElementById('user-display-email').textContent = user.EMAIL;
+  document.getElementById('user-display-email').textContent = user.email;
 
-  // Reward card — DATA1=reward_points, DATA2=description
-  document.getElementById('reward-pts').textContent  = user.FUND1 ?? 0;
-  document.getElementById('reward-title').textContent = user.EMAIL || 'Cherry Member';
-  document.getElementById('reward-desc').textContent  = user.DATA2 || 'Scan in-store QR codes to earn points on every visit.';
+  // Reward card — DATA1=reward_points, data2=description
+  document.getElementById('reward-pts').textContent  = user.fund1 ?? 0;
+  document.getElementById('reward-title').textContent = user.email || 'Cherry Member';
+  document.getElementById('reward-desc').textContent  = user.data2 || 'Scan in-store QR codes to earn points on every visit.';
 
-  // Member QR code — encodes the USERID
-  const emailName = user.EMAIL.split('@')[0];
-  const qrValue = user.USERID + '@' + emailName;
+  // Member QR code — encodes the userid
+  const emailName = user.email.split('@')[0];
+  const qrValue = user.userid + '@' + emailName;
   generateMemberQR(qrValue);
   document.getElementById('qr-label').textContent = qrValue;
 }
@@ -1051,8 +1051,8 @@ function generateMemberQR(userid) {
 }
 
 // ═══ QR SCANNER ═══════════════════════════════════
-// Scanned QR value is treated as a USERID to look up
-// and award points — or as a reward code in DATA2 format.
+// Scanned QR value is treated as a userid to look up
+// and award points — or as a reward code in data2 format.
 // Adjust the lookup logic below to match your QR format.
 async function startScan() {
   const btn = document.getElementById('scan-btn');
@@ -1105,11 +1105,11 @@ async function onQRCodeScanned(decodedText) {
   const iconEl   = document.getElementById('scan-result-icon');
   const textEl   = document.getElementById('scan-result-text');
 
-  // Look up scanned USERID in cherry_db
+  // Look up scanned userid in cherry_db
   const { data: scannedUser, error } = await db
     .from('cherry_db')
-    .select('USERID, EMAIL, POINTS, DATA1')
-    .eq('USERID', decodedText)
+    .select('userid, email, points, data1')
+    .eq('userid', decodedText)
     .single();
 
   if (error || !scannedUser) {
@@ -1122,28 +1122,28 @@ async function onQRCodeScanned(decodedText) {
   // If staff is logged in they can award points; otherwise show member info
   if (!currentUser) {
     iconEl.textContent = '🔐';
-    textEl.textContent = 'Member found: ' + (scannedUser.DATA1 || scannedUser.EMAIL) + '. Sign in to award points.';
+    textEl.textContent = 'Member found: ' + (scannedUser.data1 || scannedUser.email) + '. Sign in to award points.';
     resultEl.classList.add('show');
     return;
   }
 
   // Award 50 points to scanned member
-  const FUND1_AWARD = 50;
-  const newPoints = (scannedUser.FUND1 || 0) + FUND1_AWARD;
+  const fund1_AWARD = 50;
+  const newPoints = (scannedUser.fund1 || 0) + fund1_AWARD;
 
   await db
     .from('cherry_db')
-    .update({ FUND1: newPoints })
-    .eq('USERID', scannedUser.USERID);
+    .update({ fund1: newPoints })
+    .eq('userid', scannedUser.userid);
 
   // If the currently logged-in user scanned their own QR, update UI
-  if (currentUser.USERID === scannedUser.USERID) {
-    currentUser.FUND1 = newPoints;
+  if (currentUser.userid === scannedUser.userid) {
+    currentUser.fund1 = newPoints;
     document.getElementById('reward-pts').textContent = newPoints;
   }
 
   iconEl.textContent = '🍒';
-  textEl.textContent = `+${FUND1_AWARD} pts awarded to ${scannedUser.USERID || scannedUser.EMAIL}. New balance: ${newPoints}`;
+  textEl.textContent = `+${fund1_AWARD} pts awarded to ${scannedUser.userid || scannedUser.email}. New balance: ${newPoints}`;
   resultEl.classList.add('show');
 }
 
@@ -1274,7 +1274,7 @@ async function restoreSession() {
   const { data, error } = await db
     .from('cherry_db')
     .select('*')
-    .eq('USERID', savedUserId)
+    .eq('userid', savedUserId)
     .single();
 
   if (data) loginUser(data);
