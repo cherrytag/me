@@ -350,8 +350,6 @@
   }
 
   #user-qr-canvas {
-    width: 120px !important;
-    height: 120px !important;
     border-radius: 8px;
   }
 
@@ -728,7 +726,7 @@
       </div>
     </div>
     <div class="reward-right">
-      <canvas id="user-qr-canvas" width="120" height="120"></canvas>
+      <canvas id="user-qr-canvas"></canvas>
       <div class="qr-label" id="qr-label">Member QR</div>
     </div>
   </div>
@@ -1019,10 +1017,19 @@ function loginUser(user) {
   document.getElementById('reward-desc').textContent  = user.data2 || 'Scan in-store QR codes to earn points on every visit.';
 
   // Member QR code — encodes the userid
-  const emailName = user.email.split('@')[0];
-  const qrValue = user.userid + '@' + emailName;
-  generateMemberQR(qrValue);
-  document.getElementById('qr-label').textContent = qrValue;
+  setTimeout(() => {
+        const qrValue = "Aabc1232sdgedRRname";
+        const emailName = user.email.split('@')[0];
+        const qrValue = user.userid + emailName;
+
+        // Trigger the QR code generation
+        generateMemberQR(qrValue);
+    }, 1000);
+
+  //const emailName = user.email.split('@')[0];
+  //const qrValue = user.userid + emailName;
+  //generateMemberQR(qrValue);
+  //document.getElementById('qr-label').textContent = qrValue;
 }
 
 // ═══ LOGOUT ═══════════════════════════════════════
@@ -1043,12 +1050,31 @@ document.getElementById('btn-logout').addEventListener('click', () => {
 // ═══ GENERATE MEMBER QR CODE ══════════════════════
 function generateMemberQR(userid) {
   const canvas = document.getElementById('user-qr-canvas');
-  QRCode.toCanvas(canvas, userid, {
-    width: 120,
-    margin: 1,
-    color: { dark: '#C0152A', light: '#A8D8FA' },
-  }, err => { if (err) console.warn('QR gen error:', err); });
+
+  // Configuration options (optional)
+  const options = {
+      width: 120,       // Width and height of the canvas in pixels
+      margin: 2,        // White space around the QR code
+      color: {
+          dark: '#C0152A',  // QR code dots color
+          light: '#A8D8FA'  // Background color
+      },
+      //errorCorrectionLevel: 'H' // High error correction capability
+      err => { if (err) console.warn('QR gen error:', err);
+  };
+
+  // Use the global QRCode library object to render onto the canvas
+  QRCode.toCanvas(canvas, userId, options, function (error) {
+      if (error) {
+          console.error("Failed to generate QR Code:", error);
+          return;
+      }
+      console.log("QR Code successfully generated for User ID:", userId);
+  });
+
 }
+// Initialize the login process on page load
+window.addEventListener('DOMContentLoaded', loginUser);
 
 // ═══ QR SCANNER ═══════════════════════════════════
 // Scanned QR value is treated as a userid to look up
