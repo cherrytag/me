@@ -1002,6 +1002,8 @@ function generateRandom() {
 // ═══ LOGIN USER ═══════════════════════════════════
 function loginUser(user) {
   currentUser = user;
+  // Close auth modal on successful authentication
+  closeAuthModal();
   // Persist session by userid
   localStorage.setItem('cherry_userid', user.userid);
 
@@ -1021,7 +1023,7 @@ function loginUser(user) {
 
   // Member QR code — encodes the userid
   const emailName = user.email.split('@')[0];
-  const qrValue = user.userid + emailName;
+  const qrValue = user.userid + '@' + emailName;
   generateMemberQR(qrValue);
   document.getElementById('qr-label').textContent = emailName;
 }
