@@ -1189,13 +1189,12 @@ async function handleEarnReward(scannedData, resultEl, iconEl, textEl) {
       return;
     }
 
-    // Store for confirmation
+    // Store for confirmation (no DOM refs — look them up fresh when needed)
     window.pendingEarnData = {
       f_userid,
       provider_name,
       reward: rewardFloat,
-      idtoken,
-      resultEl, iconEl, textEl
+      idtoken
     };
 
     // Show confirmation in scan result overlay
@@ -1221,7 +1220,10 @@ async function handleEarnReward(scannedData, resultEl, iconEl, textEl) {
 async function confirmEarnRewardFromQR() {
   if (!window.pendingEarnData) return;
 
-  const { f_userid, provider_name, reward, idtoken, resultEl, iconEl, textEl } = window.pendingEarnData;
+  const { f_userid, provider_name, reward, idtoken } = window.pendingEarnData;
+  const resultEl = document.getElementById('scan-result');
+  const iconEl   = document.getElementById('scan-result-icon');
+  const textEl   = document.getElementById('scan-result-text');
 
   try {
     const transId = 'TXN-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
@@ -1308,12 +1310,11 @@ async function handleTransferReward(scannedData, resultEl, iconEl, textEl) {
 
     const hasPendingTransfer = pendingTransfers && pendingTransfers.length > 0;
 
-    // Store for subsequent selection
+    // Store for subsequent selection (no DOM refs — look them up fresh when needed)
     window.pendingTransferData = {
       r_userid,
       receiver_name,
-      hasPendingTransfer,
-      resultEl, iconEl, textEl
+      hasPendingTransfer
     };
 
     if (hasPendingTransfer) {
@@ -1336,7 +1337,10 @@ async function handleTransferReward(scannedData, resultEl, iconEl, textEl) {
 async function confirmTransferRewardFromQR(amount) {
   if (!window.pendingTransferData) return;
 
-  const { r_userid, receiver_name, resultEl, iconEl, textEl } = window.pendingTransferData;
+  const { r_userid, receiver_name } = window.pendingTransferData;
+  const resultEl = document.getElementById('scan-result');
+  const iconEl   = document.getElementById('scan-result-icon');
+  const textEl   = document.getElementById('scan-result-text');
 
   try {
     // Map amount to idtoken
