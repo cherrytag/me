@@ -8,7 +8,8 @@
 <!-- Supabase JS Client -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <!-- QR Scanner -->
-<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<!-- jsQR: lightweight, works on all browsers including iPhone Safari -->
+<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
 <!-- MapLibre GL JS + OpenFreeMap -->
 <link href="https://unpkg.com/maplibre-gl/dist/maplibre-gl.css" rel="stylesheet"/>
 <script src="https://unpkg.com/maplibre-gl/dist/maplibre-gl.js"></script>
@@ -236,10 +237,16 @@
     inset: 0;
     display: none;
     z-index: 10;
+    background: #000;
   }
-  #qr-reader { width: 100%; height: 100%; }
-  #qr-reader video { width: 100% !important; height: 100% !important; object-fit: cover; }
-  #qr-reader > * { border: none !important; }
+  #qr-video {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+  #qr-canvas { display: none; }
 
   /* ─── SCAN BUTTON ─────────────────────────────── */
   .scan-btn {
@@ -688,9 +695,10 @@
       <div class="live-dot"></div>
       <span class="live-text">Live</span>
     </div>
-    <!-- QR Reader injected here -->
+    <!-- QR Reader: video + hidden canvas for jsQR -->
     <div id="qr-reader-container">
-      <div id="qr-reader"></div>
+      <video id="qr-video" autoplay playsinline muted></video>
+      <canvas id="qr-canvas"></canvas>
     </div>
     <!-- Scan result overlay -->
     <div class="scan-result" id="scan-result">
@@ -872,7 +880,8 @@ const db = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 // ═══ STATE ════════════════════════════════════════
 let currentUser = null;   // holds the full cherry_db row
-let html5QrCode = null;
+let qrStream = null;       // active MediaStream
+let qrAnimFrame = null;    // requestAnimationFrame handle
 let leafletMap = null;
 
 // ═══ TOAST ════════════════════════════════════════
@@ -1056,66 +1065,131 @@ function generateMemberQR(userid) {
   });
 }
 
-// ═══ QR SCANNER ═══════════════════════════════════
-// Scanned QR value is treated as a userid to look up
-// and award points — or as a reward code in data2 format.
-// Adjust the lookup logic below to match your QR format.
+// ═══ QR SCANNER (cross-platform: BarcodeDetector + jsQR fallback) ═══════════
+// Uses native BarcodeDetector where available (Android Chrome, desktop Chrome/Edge)
+// Falls back to jsQR canvas scanning (iPhone Safari, Firefox, older browsers)
+
+const SCAN_BTN_HTML = `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="5" height="5"/><rect x="16" y="3" width="5" height="5"/><rect x="3" y="16" width="5" height="5"/><line x1="21" y1="12" x2="21" y2="21"/><line x1="12" y1="3" x2="12" y2="12"/><line x1="12" y1="16" x2="12" y2="21"/><line x1="16" y1="12" x2="21" y2="12"/></svg> Scan Reward Code`;
+
 async function startScan() {
   const btn = document.getElementById('scan-btn');
   btn.textContent = 'Camera opening…';
   btn.disabled = true;
 
+  // Must stop any existing stream first
+  stopStreamTracks();
+
   const container = document.getElementById('qr-reader-container');
-  container.style.display = 'block';
+  const video = document.getElementById('qr-video');
 
-  try {
-    if (!html5QrCode) html5QrCode = new Html5Qrcode('qr-reader');
+  // Camera constraints — try rear camera, fall back to any camera
+  const constraints = [
+    { video: { facingMode: { exact: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } } },
+    { video: { facingMode: 'environment',            width: { ideal: 1280 }, height: { ideal: 720 } } },
+    { video: true }
+  ];
 
-    // Try exact rear camera first (needed for iPhone Safari), fallback for others
-    try {
-      await html5QrCode.start(
-        { facingMode: { exact: 'environment' } },
-        { fps: 10, qrbox: { width: 200, height: 200 } },
-        onQRCodeScanned,
-        () => {}
-      );
-    } catch (exactErr) {
-      await html5QrCode.start(
-        { facingMode: 'environment' },
-        { fps: 10, qrbox: { width: 200, height: 200 } },
-        onQRCodeScanned,
-        () => {}
-      );
-    }
+  let stream = null;
+  for (const c of constraints) {
+    try { stream = await navigator.mediaDevices.getUserMedia(c); break; } catch(e) {}
+  }
 
-    btn.textContent = '⏹ Stop Scanning';
-    btn.disabled = false;
-    btn.onclick = stopScan;
-
-  } catch (err) {
-    console.error('Camera error:', err);
+  if (!stream) {
     showToast('Camera access denied or unavailable', 'error');
-    container.style.display = 'none';
-    btn.textContent = 'Scan Reward Code';
+    btn.innerHTML = SCAN_BTN_HTML;
     btn.disabled = false;
     btn.onclick = startScan;
+    return;
   }
+
+  qrStream = stream;
+  video.srcObject = stream;
+  await video.play().catch(() => {});
+  container.style.display = 'block';
+
+  btn.textContent = '⏹ Stop Scanning';
+  btn.disabled = false;
+  btn.onclick = stopScan;
+
+  // Choose scanning method
+  const hasBarcodeDetector = ('BarcodeDetector' in window);
+  if (hasBarcodeDetector) {
+    scanWithBarcodeDetector(video);
+  } else {
+    scanWithJsQR(video);
+  }
+}
+
+// ── BarcodeDetector (Chrome/Android/desktop) ──────────────────────────────
+async function scanWithBarcodeDetector(video) {
+  const detector = new BarcodeDetector({ formats: ['qr_code'] });
+  async function tick() {
+    if (!qrStream) return; // stopped
+    if (video.readyState === video.HAVE_ENOUGH_DATA) {
+      try {
+        const codes = await detector.detect(video);
+        if (codes.length > 0) {
+          await onQRCodeScanned(codes[0].rawValue);
+          return;
+        }
+      } catch(e) {}
+    }
+    qrAnimFrame = requestAnimationFrame(tick);
+  }
+  qrAnimFrame = requestAnimationFrame(tick);
+}
+
+// ── jsQR canvas scan (iPhone Safari, Firefox, etc.) ──────────────────────
+function scanWithJsQR(video) {
+  const canvas = document.getElementById('qr-canvas');
+  const ctx = canvas.getContext('2d');
+
+  function tick() {
+    if (!qrStream) return; // stopped
+    if (video.readyState === video.HAVE_ENOUGH_DATA) {
+      canvas.width  = video.videoWidth;
+      canvas.height = video.videoHeight;
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      const code = jsQR(imageData.data, imageData.width, imageData.height, {
+        inversionAttempts: 'dontInvert'
+      });
+      if (code) {
+        onQRCodeScanned(code.data);
+        return;
+      }
+    }
+    qrAnimFrame = requestAnimationFrame(tick);
+  }
+  qrAnimFrame = requestAnimationFrame(tick);
+}
+
+// ── Stop helpers ──────────────────────────────────────────────────────────
+function stopStreamTracks() {
+  if (qrAnimFrame) { cancelAnimationFrame(qrAnimFrame); qrAnimFrame = null; }
+  if (qrStream) { qrStream.getTracks().forEach(t => t.stop()); qrStream = null; }
 }
 
 function stopScan() {
-  if (html5QrCode) {
-    html5QrCode.stop().then(() => {
-      document.getElementById('qr-reader-container').style.display = 'none';
-      const btn = document.getElementById('scan-btn');
-      btn.innerHTML = `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="5" height="5"/><rect x="16" y="3" width="5" height="5"/><rect x="3" y="16" width="5" height="5"/><line x1="21" y1="12" x2="21" y2="21"/><line x1="12" y1="3" x2="12" y2="12"/><line x1="12" y1="16" x2="12" y2="21"/><line x1="16" y1="12" x2="21" y2="12"/></svg> Scan Reward Code`;
-      btn.disabled = false;
-      btn.onclick = startScan;
-    });
-  }
+  stopStreamTracks();
+  document.getElementById('qr-reader-container').style.display = 'none';
+  const btn = document.getElementById('scan-btn');
+  btn.innerHTML = SCAN_BTN_HTML;
+  btn.disabled = false;
+  btn.onclick = startScan;
+}
+
+function stopScanSilent() {
+  stopStreamTracks();
+  document.getElementById('qr-reader-container').style.display = 'none';
+  const btn = document.getElementById('scan-btn');
+  btn.innerHTML = SCAN_BTN_HTML;
+  btn.disabled = false;
+  btn.onclick = startScan;
 }
 
 async function onQRCodeScanned(decodedText) {
-  await stopScanSilent();
+  stopScanSilent();
 
   if (!currentUser) {
     showToast('Please sign in first', 'error');
@@ -1425,15 +1499,6 @@ async function confirmTransferRewardFromQR(amount) {
   }
 }
 
-async function stopScanSilent() {
-  if (html5QrCode) {
-    try { await html5QrCode.stop(); } catch(e) {}
-    document.getElementById('qr-reader-container').style.display = 'none';
-    const btn = document.getElementById('scan-btn');
-    btn.innerHTML = `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="5" height="5"/><rect x="16" y="3" width="5" height="5"/><rect x="3" y="16" width="5" height="5"/><line x1="21" y1="12" x2="21" y2="21"/><line x1="12" y1="3" x2="12" y2="12"/><line x1="12" y1="16" x2="12" y2="21"/><line x1="16" y1="12" x2="21" y2="12"/></svg> Scan Reward Code`;
-    btn.disabled = false;
-    btn.onclick = startScan;
-  }
 }
 
 function closeScanResult() {
