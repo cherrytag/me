@@ -1071,12 +1071,22 @@ async function startScan() {
   try {
     if (!html5QrCode) html5QrCode = new Html5Qrcode('qr-reader');
 
-    await html5QrCode.start(
-      { facingMode: 'environment' },
-      { fps: 10, qrbox: { width: 200, height: 200 } },
-      onQRCodeScanned,
-      () => {}
-    );
+    // Try exact rear camera first (needed for iPhone Safari), fallback for others
+    try {
+      await html5QrCode.start(
+        { facingMode: { exact: 'environment' } },
+        { fps: 10, qrbox: { width: 200, height: 200 } },
+        onQRCodeScanned,
+        () => {}
+      );
+    } catch (exactErr) {
+      await html5QrCode.start(
+        { facingMode: 'environment' },
+        { fps: 10, qrbox: { width: 200, height: 200 } },
+        onQRCodeScanned,
+        () => {}
+      );
+    }
 
     btn.textContent = '⏹ Stop Scanning';
     btn.disabled = false;
@@ -1197,17 +1207,18 @@ async function handleEarnReward(scannedData, resultEl, iconEl, textEl) {
       idtoken
     };
 
-    // Show confirmation in scan result overlay
+    // Show confirmation with explicit button — no setTimeout (unreliable on iPhone Safari)
     iconEl.textContent = '✅';
-    textEl.innerHTML = `<strong>${provider_name}</strong><br>${rewardFloat.toFixed(2)} points<br><br><small>Token: ${idtoken}</small><br><br>Confirm to earn this reward`;
+    textEl.innerHTML = `<strong>${provider_name}</strong><br>${rewardFloat.toFixed(2)} points`;
+    const oldBtn = document.getElementById('earn-confirm-btn');
+    if (oldBtn) oldBtn.remove();
+    const confirmBtn = document.createElement('button');
+    confirmBtn.id = 'earn-confirm-btn';
+    confirmBtn.textContent = 'Confirm & Earn';
+    confirmBtn.style.cssText = 'margin-top:12px;padding:12px 28px;background:#C0152A;color:#fff;border:none;border-radius:14px;font-size:15px;font-weight:700;cursor:pointer;font-family:DM Sans,sans-serif;';
+    confirmBtn.onclick = function() { this.remove(); confirmEarnRewardFromQR(); };
+    resultEl.appendChild(confirmBtn);
     resultEl.classList.add('show');
-
-    // Auto-confirm after 3 seconds or let user dismiss and retry
-    setTimeout(() => {
-      if (window.pendingEarnData) {
-        confirmEarnRewardFromQR();
-      }
-    }, 3000);
 
   } catch (err) {
     console.error('Earn reward error:', err);
