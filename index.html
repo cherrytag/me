@@ -696,7 +696,7 @@
     <div class="scan-result" id="scan-result">
       <div class="scan-result-icon" id="scan-result-icon">✅</div>
       <div class="scan-result-text" id="scan-result-text">QR Code validated!</div>
-      <button class="btn-auth" style="background:#fff;color:var(--cherry);border-color:#fff;" onclick="closeScanResult()">Dismiss</button>
+      <button class="btn-auth" style="background:#fff;color:var(--cherry);border-color:#fff;" onclick="closeScanResult()">Ok</button>
     </div>
   </div>
 
@@ -1107,50 +1107,307 @@ function stopScan() {
 async function onQRCodeScanned(decodedText) {
   await stopScanSilent();
 
+  if (!currentUser) {
+    showToast('Please sign in first', 'error');
+    document.getElementById('auth-modal').classList.add('active');
+    return;
+  }
+
   const resultEl = document.getElementById('scan-result');
   const iconEl   = document.getElementById('scan-result-icon');
   const textEl   = document.getElementById('scan-result-text');
 
-  // Look up scanned userid in cherry_db
-  const { data: scannedUser, error } = await db
-    .from('cherry_db')
-    .select('userid, email, points, data1')
-    .eq('userid', decodedText)
-    .single();
-
-  if (error || !scannedUser) {
+  // Check QR format to determine operation type
+  if (decodedText.includes('$')) {
+    // EARN REWARD: f_userid$provider_name$reward$cherry_code
+    await handleEarnReward(decodedText, resultEl, iconEl, textEl);
+  } else if (decodedText.includes('@')) {
+    // TRANSFER REWARD: r_userid@receiver_name
+    await handleTransferReward(decodedText, resultEl, iconEl, textEl);
+  } else {
     iconEl.textContent = '❌';
-    textEl.textContent = 'QR code not recognised. Please try again.';
+    textEl.textContent = 'Invalid QR code format. Please try again.';
     resultEl.classList.add('show');
-    return;
   }
+}
 
-  // If staff is logged in they can award points; otherwise show member info
-  if (!currentUser) {
-    iconEl.textContent = '🔐';
-    textEl.textContent = 'Member found: ' + (scannedUser.data1 || scannedUser.email) + '. Sign in to award points.';
+async function handleEarnReward(scannedData, resultEl, iconEl, textEl) {
+  try {
+    const parts = scannedData.split('$');
+    if (parts.length !== 4) {
+      iconEl.textContent = '❌';
+      textEl.textContent = 'Invalid earn reward QR format.\nExpected: userid$provider$reward$code';
+      resultEl.classList.add('show');
+      return;
+    }
+
+    const [f_userid, provider_name, reward, cherry_code] = parts;
+    const rewardFloat = parseFloat(reward);
+
+    // Create idtoken: cherry_code + reward (without decimal)
+    const rewardNoDecimal = reward.replace('.', '');
+    const idtoken = cherry_code + rewardNoDecimal;
+
+    // Debug: Show scanned values
+    console.log('=== EARN REWARD DEBUG ===');
+    console.log('Scanned Data:', scannedData);
+    console.log('f_userid:', f_userid);
+    console.log('provider_name:', provider_name);
+    console.log('reward:', reward, '| rewardNoDecimal:', rewardNoDecimal);
+    console.log('cherry_code:', cherry_code);
+    console.log('Final idtoken:', idtoken, '| Type:', typeof idtoken);
+
+    // Verify idtoken in cherry_token_db
+    const { data: tokenRecord, error } = await db
+      .from('cherry_token_db')
+      .select('*')
+      .eq('idtoken', idtoken)
+      .single();
+
+    console.log('DB Query Result:', { tokenRecord, error });
+
+    if (error || !tokenRecord) {
+      // Try alternative query to find matching records
+      const { data: allTokens, error: allError } = await db
+        .from('cherry_token_db')
+        .select('idtoken')
+        .limit(5);
+
+      let debugMsg = `❌ VERIFICATION FAILED\n\nSearching for:\n${idtoken}\n\n`;
+      
+      if (allError) {
+        debugMsg += `DB Error: ${allError.message}`;
+      } else if (allTokens && allTokens.length > 0) {
+        debugMsg += `Sample tokens in DB:\n${allTokens.map(t => t.idtoken).join('\n')}\n\nMismatch detected!`;
+      } else {
+        debugMsg += `No tokens found in database`;
+      }
+
+      iconEl.textContent = '❌';
+      textEl.innerHTML = debugMsg.replace(/\n/g, '<br>');
+      resultEl.classList.add('show');
+      return;
+    }
+
+    // Store for confirmation
+    window.pendingEarnData = {
+      f_userid,
+      provider_name,
+      reward: rewardFloat,
+      idtoken,
+      resultEl, iconEl, textEl
+    };
+
+    // Show confirmation in scan result overlay
+    iconEl.textContent = '✅';
+    textEl.innerHTML = `<strong>${provider_name}</strong><br>${rewardFloat.toFixed(2)} points<br><br><small>Token: ${idtoken}</small><br><br>Confirm to earn this reward`;
     resultEl.classList.add('show');
-    return;
+
+    // Auto-confirm after 3 seconds or let user dismiss and retry
+    setTimeout(() => {
+      if (window.pendingEarnData) {
+        confirmEarnRewardFromQR();
+      }
+    }, 3000);
+
+  } catch (err) {
+    console.error('Earn reward error:', err);
+    iconEl.textContent = '❌';
+    textEl.innerHTML = `Error processing reward<br><small>${err.message}</small>`;
+    resultEl.classList.add('show');
   }
+}
 
-  // Award 50 points to scanned member
-  const fund1_AWARD = 50;
-  const newPoints = (scannedUser.fund1 || 0) + fund1_AWARD;
+async function confirmEarnRewardFromQR() {
+  if (!window.pendingEarnData) return;
 
-  await db
-    .from('cherry_db')
-    .update({ fund1: newPoints })
-    .eq('userid', scannedUser.userid);
+  const { f_userid, provider_name, reward, idtoken, resultEl, iconEl, textEl } = window.pendingEarnData;
 
-  // If the currently logged-in user scanned their own QR, update UI
-  if (currentUser.userid === scannedUser.userid) {
+  try {
+    const transId = 'TXN-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
+    const currentTimestamp = new Date().toISOString();
+
+    // Update cherry_token_db
+    const { error: updateError } = await db
+      .from('cherry_token_db')
+      .update({
+        f_userid: f_userid,
+        r_userid: currentUser.userid,
+        t_fund1: reward,
+        time: currentTimestamp,
+        trans_id: transId
+      })
+      .eq('idtoken', idtoken);
+
+    if (updateError) {
+      throw updateError;
+    }
+
+    // Update current user's points
+    const newPoints = (currentUser.fund1 || 0) + reward;
+    const { error: pointsError } = await db
+      .from('cherry_db')
+      .update({ fund1: newPoints })
+      .eq('userid', currentUser.userid);
+
+    if (pointsError) {
+      throw pointsError;
+    }
+
     currentUser.fund1 = newPoints;
     document.getElementById('reward-pts').textContent = newPoints;
-  }
 
-  iconEl.textContent = '🍒';
-  textEl.textContent = `+${fund1_AWARD} pts awarded to ${scannedUser.userid || scannedUser.email}. New balance: ${newPoints}`;
-  resultEl.classList.add('show');
+    iconEl.textContent = '🍒';
+    textEl.textContent = 'Reward claimed successfully!';
+    resultEl.classList.add('show');
+
+    showToast('Reward claimed successfully', 'success');
+    window.pendingEarnData = null;
+
+  } catch (err) {
+    console.error('Confirm earn error:', err);
+    iconEl.textContent = '❌';
+    textEl.textContent = 'Failed to claim reward.';
+    showToast('Error claiming reward', 'error');
+  }
+}
+
+async function handleTransferReward(scannedData, resultEl, iconEl, textEl) {
+  try {
+    const parts = scannedData.split('@');
+    if (parts.length !== 2) {
+      iconEl.textContent = '❌';
+      textEl.textContent = 'Invalid transfer reward QR format.';
+      resultEl.classList.add('show');
+      return;
+    }
+
+    const [r_userid, receiver_name] = parts;
+
+    // Verify receiver exists
+    const { data: receiver, error: receiverError } = await db
+      .from('cherry_db')
+      .select('userid')
+      .eq('userid', r_userid)
+      .single();
+
+    if (receiverError || !receiver) {
+      iconEl.textContent = '❌';
+      textEl.textContent = 'Receiver not found.';
+      resultEl.classList.add('show');
+      return;
+    }
+
+    // Check for pending transfers (idtokens: 999999900250, 999999900500, 999999901000)
+    const pendingIdtokens = ['999999900250', '999999900500', '999999901000'];
+    const { data: pendingTransfers } = await db
+      .from('cherry_token_db')
+      .select('idtoken')
+      .in('idtoken', pendingIdtokens)
+      .eq('f_userid', currentUser.userid);
+
+    const hasPendingTransfer = pendingTransfers && pendingTransfers.length > 0;
+
+    // Store for subsequent selection
+    window.pendingTransferData = {
+      r_userid,
+      receiver_name,
+      hasPendingTransfer,
+      resultEl, iconEl, textEl
+    };
+
+    if (hasPendingTransfer) {
+      iconEl.textContent = '⏳';
+      textEl.textContent = `${receiver_name}\n\nPrevious transaction processing\nTry again after sometime`;
+    } else {
+      iconEl.textContent = '✅';
+      textEl.textContent = `Wish to transfer:\n2.50 or 5.00 or 10.00 points to \n: ${receiver_name}`;
+    }
+    resultEl.classList.add('show');
+
+  } catch (err) {
+    console.error('Transfer reward error:', err);
+    iconEl.textContent = '❌';
+    textEl.textContent = 'Error processing transfer.';
+    resultEl.classList.add('show');
+  }
+}
+
+async function confirmTransferRewardFromQR(amount) {
+  if (!window.pendingTransferData) return;
+
+  const { r_userid, receiver_name, resultEl, iconEl, textEl } = window.pendingTransferData;
+
+  try {
+    // Map amount to idtoken
+    const idtokenMap = {
+      2.50: '999999900250',
+      5.00: '999999900500',
+      10.00: '999999901000'
+    };
+
+    const idtoken = idtokenMap[amount];
+
+    // Verify idtoken in cherry_token_db
+    const { data: tokenRecord, error } = await db
+      .from('cherry_token_db')
+      .select('*')
+      .eq('idtoken', idtoken)
+      .single();
+
+    if (error || !tokenRecord) {
+      iconEl.textContent = '❌';
+      textEl.textContent = 'Transfer verification failed.';
+      resultEl.classList.add('show');
+      return;
+    }
+
+    const transId = 'TXN-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
+    const currentTimestamp = new Date().toISOString();
+
+    // Update cherry_token_db
+    const { error: updateError } = await db
+      .from('cherry_token_db')
+      .update({
+        f_userid: currentUser.userid,
+        r_userid: r_userid,
+        t_fund1: amount,
+        time: currentTimestamp,
+        trans_id: transId
+      })
+      .eq('idtoken', idtoken);
+
+    if (updateError) {
+      throw updateError;
+    }
+
+    // Deduct points from current user
+    const newPoints = (currentUser.fund1 || 0) - amount;
+    const { error: pointsError } = await db
+      .from('cherry_db')
+      .update({ fund1: newPoints })
+      .eq('userid', currentUser.userid);
+
+    if (pointsError) {
+      throw pointsError;
+    }
+
+    currentUser.fund1 = newPoints;
+    document.getElementById('reward-pts').textContent = newPoints;
+
+    iconEl.textContent = '🍒';
+    textEl.textContent = `Transfer successful!\n\n${amount.toFixed(2)} points to ${receiver_name}`;
+    resultEl.classList.add('show');
+
+    showToast('Transfer successful', 'success');
+    window.pendingTransferData = null;
+
+  } catch (err) {
+    console.error('Confirm transfer error:', err);
+    iconEl.textContent = '❌';
+    textEl.textContent = 'Failed to transfer reward.';
+    showToast('Error transferring reward', 'error');
+  }
 }
 
 async function stopScanSilent() {
@@ -1165,6 +1422,29 @@ async function stopScanSilent() {
 }
 
 function closeScanResult() {
+  // If transfer is pending and waiting for amount selection, don't close
+  if (window.pendingTransferData && !window.pendingTransferData.selected) {
+    // Show transfer amount options
+    const resultEl = document.getElementById('scan-result');
+    const iconEl   = document.getElementById('scan-result-icon');
+    const textEl   = document.getElementById('scan-result-text');
+    
+    // Show amount selection with buttons (using result overlay)
+    resultEl.innerHTML = `
+      <div style="text-align: center; background: white; padding: 32px 24px; border-radius: 20px; max-width: 360px;">
+        <div style="font-size: 14px; color: #7A6065; margin-bottom: 24px;">Select amount to transfer to </div>
+        <div style="font-family: 'Playfair Display', serif; font-size: 22px; color: #C0152A; margin-bottom: 8px;">${window.pendingTransferData.receiver_name}</div>
+        <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-bottom: 20px;">
+          <button onclick="confirmTransferRewardFromQR(2.50)" style="padding: 12px; border: 2px solid #EAD9DC; background: transparent; border-radius: 12px; font-weight: 600; cursor: pointer; transition: all 0.2s;" onmouseover="this.style.borderColor='#C0152A'; this.style.background='rgba(192,21,42,0.05)'" onmouseout="this.style.borderColor='#EAD9DC'; this.style.background='transparent'">2.50</button>
+          <button onclick="confirmTransferRewardFromQR(5.00)" style="padding: 12px; border: 2px solid #EAD9DC; background: transparent; border-radius: 12px; font-weight: 600; cursor: pointer; transition: all 0.2s;" onmouseover="this.style.borderColor='#C0152A'; this.style.background='rgba(192,21,42,0.05)'" onmouseout="this.style.borderColor='#EAD9DC'; this.style.background='transparent'">5.00</button>
+          <button onclick="confirmTransferRewardFromQR(10.00)" style="padding: 12px; border: 2px solid #EAD9DC; background: transparent; border-radius: 12px; font-weight: 600; cursor: pointer; transition: all 0.2s;" onmouseover="this.style.borderColor='#C0152A'; this.style.background='rgba(192,21,42,0.05)'" onmouseout="this.style.borderColor='#EAD9DC'; this.style.background='transparent'">10.00</button>
+        </div>
+        <button onclick="document.getElementById('scan-result').classList.remove('show'); window.pendingTransferData = null;" style="width: 100%; padding: 12px; background: #EAD9DC; border: none; border-radius: 12px; font-weight: 600; cursor: pointer; color: #1A0A0E;">Cancel Transfer</button>
+      </div>
+    `;
+    return;
+  }
+  
   document.getElementById('scan-result').classList.remove('show');
   if (!currentUser) {
     document.getElementById('auth-modal').classList.add('active');
