@@ -1,0 +1,1005 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Payment Portal</title>
+<script src="https://js.stripe.com/v3/"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #0a0e1a;
+    --surface: #111827;
+    --surface2: #1a2235;
+    --surface3: #1f2d45;
+    --border: rgba(99,179,237,0.15);
+    --border-active: rgba(99,179,237,0.5);
+    --accent: #3b82f6;
+    --accent2: #06b6d4;
+    --text: #f0f6ff;
+    --text2: #8da4bf;
+    --text3: #4a6480;
+    --success: #10b981;
+    --warning: #f59e0b;
+    --danger: #ef4444;
+    --font: 'DM Sans', sans-serif;
+    --mono: 'DM Mono', monospace;
+    --radius: 12px;
+    --radius-sm: 8px;
+  }
+
+  body {
+    font-family: var(--font);
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    padding: 2rem 1rem 4rem;
+  }
+
+  body::before {
+    content: '';
+    position: fixed;
+    top: -200px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 600px;
+    height: 400px;
+    background: radial-gradient(ellipse, rgba(59,130,246,0.08) 0%, transparent 70%);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .portal {
+    width: 100%;
+    max-width: 560px;
+    position: relative;
+    z-index: 1;
+  }
+
+  .header {
+    text-align: center;
+    margin-bottom: 2rem;
+  }
+
+  .logo-mark {
+    width: 48px;
+    height: 48px;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    border-radius: 14px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 1rem;
+    font-size: 22px;
+  }
+
+  .header h1 {
+    font-size: 1.6rem;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    color: var(--text);
+  }
+
+  .header p {
+    font-size: 0.875rem;
+    color: var(--text2);
+    margin-top: 4px;
+  }
+
+  .card {
+    background: var(--surface);
+    border: 0.5px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1.5rem;
+    margin-bottom: 1rem;
+  }
+
+  .section-label {
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--text3);
+    margin-bottom: 1rem;
+  }
+
+  /* Payment type toggle */
+  .type-toggle {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin-bottom: 0;
+  }
+
+  .type-btn {
+    padding: 0.75rem;
+    background: var(--surface2);
+    border: 0.5px solid var(--border);
+    border-radius: var(--radius-sm);
+    color: var(--text2);
+    font-family: var(--font);
+    font-size: 0.875rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.15s;
+    text-align: center;
+  }
+
+  .type-btn:hover { border-color: var(--border-active); color: var(--text); }
+
+  .type-btn.active {
+    background: rgba(59,130,246,0.12);
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+
+  /* Amount grid */
+  .amount-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+  }
+
+  .amount-btn {
+    padding: 0.875rem 0.5rem;
+    background: var(--surface2);
+    border: 0.5px solid var(--border);
+    border-radius: var(--radius-sm);
+    color: var(--text2);
+    font-family: var(--font);
+    font-size: 0.9rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.15s;
+    text-align: center;
+    position: relative;
+  }
+
+  .amount-btn:hover { border-color: var(--border-active); color: var(--text); }
+
+  .amount-btn.active {
+    background: rgba(59,130,246,0.12);
+    border-color: var(--accent);
+    color: var(--text);
+  }
+
+  .amount-btn .price {
+    display: block;
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: inherit;
+  }
+
+  .amount-btn .period {
+    display: block;
+    font-size: 0.7rem;
+    color: var(--text3);
+    margin-top: 2px;
+  }
+
+  .amount-btn.active .period { color: rgba(99,179,237,0.6); }
+
+  .badge {
+    position: absolute;
+    top: -8px;
+    right: 8px;
+    background: var(--accent);
+    color: white;
+    font-size: 9px;
+    font-weight: 600;
+    padding: 2px 6px;
+    border-radius: 20px;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+  }
+
+  /* Payment method tabs */
+  .method-tabs {
+    display: flex;
+    gap: 0;
+    border: 0.5px solid var(--border);
+    border-radius: var(--radius-sm);
+    overflow: hidden;
+    margin-bottom: 1.25rem;
+  }
+
+  .method-tab {
+    flex: 1;
+    padding: 0.65rem;
+    background: var(--surface2);
+    border: none;
+    color: var(--text2);
+    font-family: var(--font);
+    font-size: 0.8rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.15s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+  }
+
+  .method-tab + .method-tab { border-left: 0.5px solid var(--border); }
+  .method-tab:hover { color: var(--text); }
+
+  .method-tab.active {
+    background: rgba(59,130,246,0.1);
+    color: var(--accent);
+  }
+
+  .method-icon { font-size: 16px; }
+
+  /* Stripe elements */
+  .stripe-panel { display: none; }
+  .stripe-panel.visible { display: block; }
+
+  .field-row { margin-bottom: 1rem; }
+
+  .field-row label {
+    display: block;
+    font-size: 12px;
+    color: var(--text2);
+    margin-bottom: 6px;
+    font-weight: 500;
+  }
+
+  .field-row input,
+  .field-row select {
+    width: 100%;
+    background: var(--surface2);
+    border: 0.5px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 0.65rem 0.875rem;
+    color: var(--text);
+    font-family: var(--font);
+    font-size: 0.9rem;
+    outline: none;
+    transition: border-color 0.15s;
+  }
+
+  .field-row input:focus,
+  .field-row select:focus { border-color: var(--accent); }
+
+  .field-row input::placeholder { color: var(--text3); }
+
+  .field-row select { appearance: none; cursor: pointer; }
+
+  .field-row select option { background: var(--surface2); }
+
+  .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+
+  #card-element,
+  #card-number-element,
+  #card-expiry-element,
+  #card-cvc-element {
+    background: var(--surface2);
+    border: 0.5px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 0.75rem 0.875rem;
+    transition: border-color 0.15s;
+  }
+
+  #card-element.StripeElement--focus,
+  #card-number-element.StripeElement--focus,
+  #card-expiry-element.StripeElement--focus,
+  #card-cvc-element.StripeElement--focus {
+    border-color: var(--accent);
+  }
+
+  /* Bank transfer panel */
+  .bank-panel { display: none; }
+  .bank-panel.visible { display: block; }
+
+  .bank-details {
+    background: var(--surface2);
+    border: 0.5px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 1rem;
+    margin-bottom: 1rem;
+  }
+
+  .bank-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 6px 0;
+    border-bottom: 0.5px solid var(--border);
+    font-size: 0.875rem;
+  }
+
+  .bank-row:last-child { border-bottom: none; }
+  .bank-row .label { color: var(--text2); }
+  .bank-row .value { font-family: var(--mono); font-size: 0.82rem; color: var(--text); }
+
+  .copy-btn {
+    background: none;
+    border: 0.5px solid var(--border);
+    border-radius: 4px;
+    color: var(--text3);
+    font-size: 11px;
+    padding: 2px 6px;
+    cursor: pointer;
+    font-family: var(--font);
+    transition: all 0.15s;
+  }
+
+  .copy-btn:hover { color: var(--accent); border-color: var(--accent); }
+
+  .info-box {
+    background: rgba(245,158,11,0.08);
+    border: 0.5px solid rgba(245,158,11,0.25);
+    border-radius: var(--radius-sm);
+    padding: 0.75rem 1rem;
+    font-size: 0.8rem;
+    color: #fbbf24;
+    margin-bottom: 1rem;
+    line-height: 1.5;
+  }
+
+  /* File upload */
+  .upload-zone {
+    border: 1.5px dashed var(--border);
+    border-radius: var(--radius-sm);
+    padding: 1.5rem;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.15s;
+    position: relative;
+  }
+
+  .upload-zone:hover { border-color: var(--border-active); background: rgba(99,179,237,0.03); }
+  .upload-zone.has-file { border-color: var(--success); background: rgba(16,185,129,0.04); }
+
+  .upload-zone input { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
+
+  .upload-icon { font-size: 24px; margin-bottom: 8px; }
+  .upload-text { font-size: 0.85rem; color: var(--text2); }
+  .upload-text strong { color: var(--text); }
+  .upload-hint { font-size: 0.75rem; color: var(--text3); margin-top: 4px; }
+
+  #file-preview {
+    display: none;
+    align-items: center;
+    gap: 10px;
+    margin-top: 10px;
+    padding: 8px 12px;
+    background: var(--surface2);
+    border-radius: var(--radius-sm);
+    border: 0.5px solid var(--border);
+  }
+
+  #file-preview.visible { display: flex; }
+  #file-preview img { width: 40px; height: 40px; object-fit: cover; border-radius: 4px; }
+  #file-preview .file-info { flex: 1; min-width: 0; }
+  #file-preview .file-name { font-size: 0.8rem; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #file-preview .file-size { font-size: 0.72rem; color: var(--text3); }
+  #file-preview .remove-file { background: none; border: none; color: var(--text3); cursor: pointer; font-size: 18px; line-height: 1; padding: 2px; }
+  #file-preview .remove-file:hover { color: var(--danger); }
+
+  /* Summary */
+  .summary-row {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.875rem;
+    padding: 6px 0;
+    color: var(--text2);
+  }
+
+  .summary-row.total {
+    border-top: 0.5px solid var(--border);
+    margin-top: 4px;
+    padding-top: 12px;
+    color: var(--text);
+    font-weight: 600;
+    font-size: 1rem;
+  }
+
+  .summary-row .val { color: var(--text); }
+  .summary-row.total .val { color: var(--accent); font-size: 1.1rem; }
+
+  /* Submit button */
+  .submit-btn {
+    width: 100%;
+    padding: 1rem;
+    background: var(--accent);
+    border: none;
+    border-radius: var(--radius-sm);
+    color: white;
+    font-family: var(--font);
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    letter-spacing: -0.01em;
+  }
+
+  .submit-btn:hover { background: #2563eb; transform: translateY(-1px); }
+  .submit-btn:active { transform: translateY(0); }
+  .submit-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+  .submit-btn .spinner {
+    width: 18px; height: 18px;
+    border: 2px solid rgba(255,255,255,0.3);
+    border-top-color: white;
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+    display: none;
+  }
+
+  .submit-btn.loading .spinner { display: block; }
+  .submit-btn.loading .btn-text { opacity: 0.6; }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* Alerts */
+  .alert {
+    padding: 0.875rem 1rem;
+    border-radius: var(--radius-sm);
+    font-size: 0.875rem;
+    margin-bottom: 1rem;
+    display: none;
+    line-height: 1.5;
+  }
+
+  .alert.visible { display: block; }
+  .alert.error { background: rgba(239,68,68,0.1); border: 0.5px solid rgba(239,68,68,0.3); color: #fca5a5; }
+  .alert.success { background: rgba(16,185,129,0.1); border: 0.5px solid rgba(16,185,129,0.3); color: #6ee7b7; }
+
+  /* Config notice */
+  .config-notice {
+    background: rgba(59,130,246,0.07);
+    border: 0.5px solid rgba(59,130,246,0.2);
+    border-radius: var(--radius-sm);
+    padding: 0.875rem 1rem;
+    font-size: 0.78rem;
+    color: var(--text2);
+    line-height: 1.6;
+    margin-top: 1rem;
+  }
+
+  .config-notice code {
+    font-family: var(--mono);
+    font-size: 0.75rem;
+    background: rgba(99,179,237,0.12);
+    padding: 1px 5px;
+    border-radius: 4px;
+    color: var(--accent2);
+  }
+
+  .secure-badge {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    font-size: 0.75rem;
+    color: var(--text3);
+    margin-top: 1rem;
+  }
+
+  .secure-badge svg { flex-shrink: 0; }
+</style>
+</head>
+<body>
+
+<div class="portal">
+  <div class="header">
+    <div class="logo-mark">💳</div>
+    <h1>Payment Portal</h1>
+    <p>Secure payments powered by Stripe</p>
+  </div>
+
+  <!-- Alert area -->
+  <div class="alert error" id="alert-error"></div>
+  <div class="alert success" id="alert-success"></div>
+
+  <!-- Step 1: Payment type -->
+  <div class="card">
+    <div class="section-label">Payment Type</div>
+    <div class="type-toggle">
+      <button class="type-btn active" data-type="subscription" onclick="setType('subscription')">Monthly Subscription</button>
+      <button class="type-btn" data-type="topup" onclick="setType('topup')">Top-Up</button>
+    </div>
+  </div>
+
+  <!-- Step 2: Amount selection -->
+  <div class="card">
+    <div class="section-label" id="amount-label">Choose Plan</div>
+
+    <!-- Subscription amounts -->
+    <div class="amount-grid" id="subscription-amounts">
+      <button class="amount-btn active" data-amount="30" onclick="setAmount(30)">
+        <span class="badge">Popular</span>
+        <span class="price">NZ$30</span>
+        <span class="period">per month</span>
+      </button>
+      <button class="amount-btn" data-amount="50" onclick="setAmount(50)">
+        <span class="price">NZ$50</span>
+        <span class="period">per month</span>
+      </button>
+    </div>
+
+    <!-- Top-up amounts -->
+    <div class="amount-grid" id="topup-amounts" style="display:none">
+      <button class="amount-btn" data-amount="20" onclick="setAmount(20)">
+        <span class="price">NZ$20</span>
+        <span class="period">one-time</span>
+      </button>
+      <button class="amount-btn active" data-amount="30" onclick="setAmount(30)">
+        <span class="price">NZ$30</span>
+        <span class="period">one-time</span>
+      </button>
+      <button class="amount-btn" data-amount="50" onclick="setAmount(50)">
+        <span class="price">NZ$50</span>
+        <span class="period">one-time</span>
+      </button>
+      <button class="amount-btn" data-amount="100" onclick="setAmount(100)">
+        <span class="badge">Best value</span>
+        <span class="price">NZ$100</span>
+        <span class="period">one-time</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- Step 3: Customer info -->
+  <div class="card">
+    <div class="section-label">Your Details</div>
+    <div class="row2">
+      <div class="field-row">
+        <label>First Name</label>
+        <input type="text" id="first-name" placeholder="Jane">
+      </div>
+      <div class="field-row">
+        <label>Last Name</label>
+        <input type="text" id="last-name" placeholder="Smith">
+      </div>
+    </div>
+    <div class="field-row">
+      <label>Email Address</label>
+      <input type="email" id="email" placeholder="jane@example.com">
+    </div>
+  </div>
+
+  <!-- Step 4: Payment method -->
+  <div class="card">
+    <div class="section-label">Payment Method</div>
+
+    <div class="method-tabs">
+      <button class="method-tab active" onclick="setMethod('stripe')">
+        <svg class="method-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="5" width="20" height="14" rx="3"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
+        Card (Stripe)
+      </button>
+      <button class="method-tab" onclick="setMethod('bank')">
+        <svg class="method-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9,22 9,12 15,12 15,22"/></svg>
+        Bank Transfer
+      </button>
+    </div>
+
+    <!-- Stripe panel -->
+    <div class="stripe-panel visible" id="stripe-panel">
+      <div class="field-row">
+        <label>Card Number</label>
+        <div id="card-element"></div>
+      </div>
+    </div>
+
+    <!-- Bank transfer panel -->
+    <div class="bank-panel" id="bank-panel">
+      <div class="info-box">
+        ⚠ Transfer the exact amount and use your email as the payment reference. Upload your receipt below after transferring.
+      </div>
+      <div class="bank-details">
+        <div class="bank-row">
+          <span class="label">Bank</span>
+          <span class="value">ANZ Bank NZ</span>
+        </div>
+        <div class="bank-row">
+          <span class="label">Account Name</span>
+          <span class="value">Your Company Ltd</span>
+        </div>
+        <div class="bank-row">
+          <span class="label">Account Number</span>
+          <span class="value" id="acct-num">01-0123-0456789-00</span>
+          <button class="copy-btn" onclick="copyText('01-0123-0456789-00')">Copy</button>
+        </div>
+        <div class="bank-row">
+          <span class="label">Reference</span>
+          <span class="value" id="bank-reference">Use your email</span>
+        </div>
+        <div class="bank-row">
+          <span class="label">Amount</span>
+          <span class="value" id="bank-amount">NZ$30.00</span>
+        </div>
+      </div>
+
+      <!-- File upload -->
+      <div class="field-row">
+        <label>Upload Payment Receipt *</label>
+        <div class="upload-zone" id="upload-zone">
+          <input type="file" id="receipt-file" accept="image/*,.pdf" onchange="handleFileSelect(event)">
+          <div class="upload-icon">📎</div>
+          <div class="upload-text"><strong>Click to upload</strong> or drag and drop</div>
+          <div class="upload-hint">PNG, JPG, PDF up to 10MB</div>
+        </div>
+        <div id="file-preview">
+          <img id="preview-img" src="" alt="">
+          <div class="file-info">
+            <div class="file-name" id="preview-name"></div>
+            <div class="file-size" id="preview-size"></div>
+          </div>
+          <button class="remove-file" onclick="removeFile()" title="Remove">✕</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Order Summary -->
+  <div class="card">
+    <div class="section-label">Order Summary</div>
+    <div class="summary-row">
+      <span>Type</span>
+      <span class="val" id="sum-type">Monthly Subscription</span>
+    </div>
+    <div class="summary-row">
+      <span>Amount</span>
+      <span class="val" id="sum-amount">NZ$30.00</span>
+    </div>
+    <div class="summary-row">
+      <span>Method</span>
+      <span class="val" id="sum-method">Card (Stripe)</span>
+    </div>
+    <div class="summary-row total">
+      <span>Total Due</span>
+      <span class="val" id="sum-total">NZ$30.00</span>
+    </div>
+  </div>
+
+  <!-- Submit -->
+  <button class="submit-btn" id="submit-btn" onclick="handleSubmit()">
+    <div class="spinner"></div>
+    <span class="btn-text" id="btn-text">Pay NZ$30.00</span>
+  </button>
+
+  <div class="secure-badge">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+    Payments are encrypted and processed securely
+  </div>
+
+  <div class="config-notice">
+    <strong>⚙ Configuration required:</strong> Replace <code>YOUR_STRIPE_PUBLISHABLE_KEY</code> in the script, and set your Supabase <code>SUPABASE_URL</code> and <code>SUPABASE_ANON_KEY</code>. Update the bank account details above with your real account information. For Stripe payments, configure your backend endpoint to create Payment Intents.
+  </div>
+</div>
+
+<script>
+  // ─── CONFIG — replace with your real values ───────────────────────────────
+  const STRIPE_PUBLISHABLE_KEY = 'YOUR_STRIPE_PUBLISHABLE_KEY';
+  const SUPABASE_URL = 'YOUR_SUPABASE_URL';
+  const SUPABASE_ANON_KEY = 'YOUR_SUPABASE_ANON_KEY';
+  const SUPABASE_BUCKET = 'payment-receipts';
+  const SUPABASE_TABLE = 'transactions';
+  const PAYMENT_INTENT_ENDPOINT = '/api/create-payment-intent'; // your backend
+  // ──────────────────────────────────────────────────────────────────────────
+
+  let stripe, cardElement;
+  let currentType = 'subscription';
+  let currentAmount = 30;
+  let currentMethod = 'stripe';
+  let selectedFile = null;
+
+  // Init Stripe
+  try {
+    if (STRIPE_PUBLISHABLE_KEY !== 'YOUR_STRIPE_PUBLISHABLE_KEY') {
+      stripe = Stripe(STRIPE_PUBLISHABLE_KEY);
+      const elements = stripe.elements({
+        appearance: {
+          theme: 'night',
+          variables: {
+            colorPrimary: '#3b82f6',
+            colorBackground: '#1a2235',
+            colorText: '#f0f6ff',
+            colorDanger: '#ef4444',
+            fontFamily: 'DM Sans, sans-serif',
+            borderRadius: '8px',
+          }
+        }
+      });
+      cardElement = elements.create('card', {
+        style: {
+          base: {
+            fontSize: '15px',
+            color: '#f0f6ff',
+            '::placeholder': { color: '#4a6480' }
+          }
+        }
+      });
+      cardElement.mount('#card-element');
+    } else {
+      document.getElementById('card-element').innerHTML =
+        '<div style="color:#4a6480;font-size:0.85rem;padding:8px 0;">Stripe card element will appear here after configuring your publishable key.</div>';
+    }
+  } catch(e) {
+    console.warn('Stripe init error:', e);
+  }
+
+  function setType(type) {
+    currentType = type;
+    document.querySelectorAll('.type-btn').forEach(b => b.classList.remove('active'));
+    document.querySelector(`[data-type="${type}"]`).classList.add('active');
+
+    if (type === 'subscription') {
+      document.getElementById('subscription-amounts').style.display = 'grid';
+      document.getElementById('topup-amounts').style.display = 'none';
+      document.getElementById('amount-label').textContent = 'Choose Plan';
+      currentAmount = 30;
+      document.querySelectorAll('#subscription-amounts .amount-btn').forEach(b => {
+        b.classList.toggle('active', parseInt(b.dataset.amount) === 30);
+      });
+    } else {
+      document.getElementById('subscription-amounts').style.display = 'none';
+      document.getElementById('topup-amounts').style.display = 'grid';
+      document.getElementById('amount-label').textContent = 'Choose Amount';
+      currentAmount = 30;
+      document.querySelectorAll('#topup-amounts .amount-btn').forEach(b => {
+        b.classList.toggle('active', parseInt(b.dataset.amount) === 30);
+      });
+    }
+    updateSummary();
+  }
+
+  function setAmount(amount) {
+    currentAmount = amount;
+    const grid = currentType === 'subscription' ? '#subscription-amounts' : '#topup-amounts';
+    document.querySelectorAll(`${grid} .amount-btn`).forEach(b => {
+      b.classList.toggle('active', parseInt(b.dataset.amount) === amount);
+    });
+    document.getElementById('bank-amount').textContent = `NZ$${amount}.00`;
+    updateSummary();
+  }
+
+  function setMethod(method) {
+    currentMethod = method;
+    document.querySelectorAll('.method-tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.method-tab')[method === 'stripe' ? 0 : 1].classList.add('active');
+
+    document.getElementById('stripe-panel').classList.toggle('visible', method === 'stripe');
+    document.getElementById('bank-panel').classList.toggle('visible', method === 'bank');
+
+    updateSummary();
+  }
+
+  function updateSummary() {
+    const typeLabel = currentType === 'subscription' ? 'Monthly Subscription' : 'Top-Up';
+    const methodLabel = currentMethod === 'stripe' ? 'Card (Stripe)' : 'Bank Transfer';
+    document.getElementById('sum-type').textContent = typeLabel;
+    document.getElementById('sum-amount').textContent = `NZ$${currentAmount}.00`;
+    document.getElementById('sum-method').textContent = methodLabel;
+    document.getElementById('sum-total').textContent = `NZ$${currentAmount}.00`;
+    document.getElementById('btn-text').textContent = `Pay NZ$${currentAmount}.00`;
+  }
+
+  function handleFileSelect(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+    if (file.size > 10 * 1024 * 1024) {
+      showAlert('error', 'File must be under 10MB.');
+      return;
+    }
+    selectedFile = file;
+    document.getElementById('upload-zone').classList.add('has-file');
+    document.getElementById('preview-name').textContent = file.name;
+    document.getElementById('preview-size').textContent = (file.size / 1024).toFixed(1) + ' KB';
+
+    if (file.type.startsWith('image/')) {
+      const reader = new FileReader();
+      reader.onload = e => { document.getElementById('preview-img').src = e.target.result; };
+      reader.readAsDataURL(file);
+      document.getElementById('preview-img').style.display = 'block';
+    } else {
+      document.getElementById('preview-img').style.display = 'none';
+    }
+    document.getElementById('file-preview').classList.add('visible');
+  }
+
+  function removeFile() {
+    selectedFile = null;
+    document.getElementById('receipt-file').value = '';
+    document.getElementById('upload-zone').classList.remove('has-file');
+    document.getElementById('file-preview').classList.remove('visible');
+  }
+
+  function copyText(text) {
+    navigator.clipboard.writeText(text).then(() => {
+      showAlert('success', 'Account number copied to clipboard!');
+      setTimeout(() => hideAlert('success'), 2500);
+    });
+  }
+
+  function showAlert(type, msg) {
+    const el = document.getElementById(`alert-${type}`);
+    el.textContent = msg;
+    el.classList.add('visible');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  function hideAlert(type) {
+    document.getElementById(`alert-${type}`).classList.remove('visible');
+  }
+
+  function setLoading(loading) {
+    const btn = document.getElementById('submit-btn');
+    btn.disabled = loading;
+    btn.classList.toggle('loading', loading);
+  }
+
+  function validateForm() {
+    const firstName = document.getElementById('first-name').value.trim();
+    const lastName = document.getElementById('last-name').value.trim();
+    const email = document.getElementById('email').value.trim();
+    if (!firstName || !lastName) { showAlert('error', 'Please enter your full name.'); return false; }
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { showAlert('error', 'Please enter a valid email address.'); return false; }
+    if (currentMethod === 'bank' && !selectedFile) { showAlert('error', 'Please upload your payment receipt.'); return false; }
+    return true;
+  }
+
+  // ─── Supabase helpers ──────────────────────────────────────────────────────
+  async function uploadToSupabase(file, email) {
+    const ext = file.name.split('.').pop();
+    const timestamp = Date.now();
+    const filename = `receipts/${email.replace('@','_at_')}_${timestamp}.${ext}`;
+
+    const uploadRes = await fetch(
+      `${SUPABASE_URL}/storage/v1/object/${SUPABASE_BUCKET}/${filename}`,
+      {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+          'Content-Type': file.type,
+          'x-upsert': 'true'
+        },
+        body: file
+      }
+    );
+
+    if (!uploadRes.ok) {
+      const err = await uploadRes.json().catch(() => ({}));
+      throw new Error(err.message || 'File upload failed');
+    }
+
+    return `${SUPABASE_URL}/storage/v1/object/public/${SUPABASE_BUCKET}/${filename}`;
+  }
+
+  async function saveTransactionToSupabase(txData) {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/${SUPABASE_TABLE}`, {
+      method: 'POST',
+      headers: {
+        'apikey': SUPABASE_ANON_KEY,
+        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+        'Content-Type': 'application/json',
+        'Prefer': 'return=representation'
+      },
+      body: JSON.stringify(txData)
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.message || 'Failed to save transaction');
+    }
+    return await res.json();
+  }
+
+  // ─── Main submit handler ───────────────────────────────────────────────────
+  async function handleSubmit() {
+    hideAlert('error');
+    hideAlert('success');
+    if (!validateForm()) return;
+
+    const firstName = document.getElementById('first-name').value.trim();
+    const lastName = document.getElementById('last-name').value.trim();
+    const email = document.getElementById('email').value.trim();
+
+    // Demo mode guard
+    const isDemo = STRIPE_PUBLISHABLE_KEY === 'YOUR_STRIPE_PUBLISHABLE_KEY'
+      || SUPABASE_URL === 'YOUR_SUPABASE_URL';
+
+    if (isDemo) {
+      showAlert('success',
+        `✓ Demo mode: Payment of NZ$${currentAmount} via ${currentMethod === 'stripe' ? 'Stripe card' : 'bank transfer'} for ${email} recorded. Configure API keys for live payments.`
+      );
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      let receiptUrl = null;
+      let stripePaymentId = null;
+
+      // ── Bank transfer: upload receipt ──────────────────────────────────────
+      if (currentMethod === 'bank') {
+        receiptUrl = await uploadToSupabase(selectedFile, email);
+      }
+
+      // ── Stripe card payment ────────────────────────────────────────────────
+      if (currentMethod === 'stripe') {
+        // 1. Create PaymentIntent on your backend
+        const intentRes = await fetch(PAYMENT_INTENT_ENDPOINT, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            amount: currentAmount * 100, // cents
+            currency: 'nzd',
+            type: currentType,
+            email
+          })
+        });
+
+        if (!intentRes.ok) throw new Error('Failed to create payment intent');
+        const { client_secret } = await intentRes.json();
+
+        // 2. Confirm card payment
+        const { paymentIntent, error } = await stripe.confirmCardPayment(client_secret, {
+          payment_method: {
+            card: cardElement,
+            billing_details: { name: `${firstName} ${lastName}`, email }
+          }
+        });
+
+        if (error) throw new Error(error.message);
+        stripePaymentId = paymentIntent.id;
+      }
+
+      // ── Save transaction to Supabase ───────────────────────────────────────
+      const txData = {
+        first_name: firstName,
+        last_name: lastName,
+        email,
+        payment_type: currentType,
+        amount: currentAmount,
+        currency: 'NZD',
+        payment_method: currentMethod,
+        status: currentMethod === 'stripe' ? 'completed' : 'pending_verification',
+        stripe_payment_id: stripePaymentId,
+        receipt_url: receiptUrl,
+        created_at: new Date().toISOString()
+      };
+
+      await saveTransactionToSupabase(txData);
+
+      showAlert('success',
+        currentMethod === 'stripe'
+          ? `✓ Payment of NZ$${currentAmount} successful! A confirmation will be sent to ${email}.`
+          : `✓ Receipt uploaded and transaction submitted. We'll verify your NZ$${currentAmount} transfer and confirm to ${email} within 1 business day.`
+      );
+
+      // Reset form
+      document.getElementById('first-name').value = '';
+      document.getElementById('last-name').value = '';
+      document.getElementById('email').value = '';
+      removeFile();
+
+    } catch (err) {
+      console.error(err);
+      showAlert('error', `Payment failed: ${err.message}`);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  // Sync bank reference with email as user types
+  document.getElementById('email').addEventListener('input', function() {
+    const ref = this.value || 'Use your email';
+    document.getElementById('bank-reference').textContent = ref;
+  });
+</script>
+</body>
+</html>
