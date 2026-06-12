@@ -332,6 +332,13 @@
     line-height: 1.5;
   }
 
+  .reward-redeemed-label {
+    font-size: 11px;
+    color: var(--accent, #16a34a);
+    font-weight: 600;
+    margin-top: 4px;
+  }
+
   .reward-pts {
     font-size: 28px;
     font-weight: 700;
@@ -730,6 +737,7 @@
         </div>
         <div class="reward-title" id="reward-title">Welcome Reward</div>
         <div class="reward-desc" id="reward-desc">Sign in to unlock your rewards and start earning points at Cherry stores.</div>
+        <div class="reward-redeemed-label" id="reward-redeemed-label" style="display:none;">Redeemed today</div>
       </div>
       <div>
         <div class="reward-pts" id="reward-pts">–</div>
@@ -1008,6 +1016,13 @@ function generateRandom() {
   return part1Capital + part2Smalls + part3Numbers + part4Smalls + part5Capitals;
 }
 
+// ═══ UPDATE REWARD DESC / REDEEMED LABEL ══════════
+function updateRewardDesc(user) {
+  const hasFund2 = typeof user.fund2 === 'number' && user.fund2 >= 0;
+  document.getElementById('reward-desc').textContent = hasFund2 ? user.fund2 : (user.data2 || 'Scan in-store QR codes to earn points on every visit.');
+  document.getElementById('reward-redeemed-label').style.display = hasFund2 ? 'block' : 'none';
+}
+
 // ═══ LOGIN USER ═══════════════════════════════════
 function loginUser(user) {
   currentUser = user;
@@ -1028,7 +1043,7 @@ function loginUser(user) {
   // Reward card — DATA1=reward_points, data2=description
   document.getElementById('reward-pts').textContent  = user.fund1 ?? 0;
   document.getElementById('reward-title').textContent = user.email || 'Cherry Member';
-  document.getElementById('reward-desc').textContent  = user.data2 || 'Scan in-store QR codes to earn points on every visit.';
+  updateRewardDesc(user);
 
   // Member QR code — encodes the userid
   const emailName = user.email.split('@')[0];
@@ -1046,6 +1061,7 @@ document.getElementById('btn-logout').addEventListener('click', () => {
   document.getElementById('reward-pts').textContent    = '–';
   document.getElementById('reward-title').textContent  = 'Welcome Reward';
   document.getElementById('reward-desc').textContent   = 'Sign in to unlock your rewards and start earning.';
+  document.getElementById('reward-redeemed-label').style.display = 'none';
   document.getElementById('qr-label').textContent = 'Member QR';
   showToast('Signed out');
   document.getElementById('user-qr-canvas').innerHTML = '';
@@ -1643,6 +1659,22 @@ async function restoreSession() {
     .single();
 
   if (data) loginUser(data);
+
+  // Poll for fund2 updates (e.g. redemptions applied externally)
+  setInterval(async () => {
+    if (!currentUser) return;
+    const { data: refreshed, error: refreshError } = await db
+      .from('cherry_db')
+      .select('fund2, data2')
+      .eq('userid', currentUser.userid)
+      .single();
+
+    if (!refreshError && refreshed) {
+      currentUser.fund2 = refreshed.fund2;
+      currentUser.data2 = refreshed.data2;
+      updateRewardDesc(currentUser);
+    }
+  }, 5000);
 }
 
 // ═══ INIT ═════════════════════════════════════════
