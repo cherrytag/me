@@ -4,7 +4,6 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Payment Portal</title>
-<script src="https://js.stripe.com/v3/"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
@@ -274,24 +273,6 @@
   .field-row select option { background: var(--surface2); }
 
   .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-
-  #card-element,
-  #card-number-element,
-  #card-expiry-element,
-  #card-cvc-element {
-    background: var(--surface2);
-    border: 0.5px solid var(--border);
-    border-radius: var(--radius-sm);
-    padding: 0.75rem 0.875rem;
-    transition: border-color 0.15s;
-  }
-
-  #card-element.StripeElement--focus,
-  #card-number-element.StripeElement--focus,
-  #card-expiry-element.StripeElement--focus,
-  #card-cvc-element.StripeElement--focus {
-    border-color: var(--accent);
-  }
 
   /* Bank transfer panel */
   .bank-panel { display: none; }
@@ -587,9 +568,8 @@
 
     <!-- Stripe panel -->
     <div class="stripe-panel visible" id="stripe-panel">
-      <div class="field-row">
-        <label>Card Number</label>
-        <div id="card-element"></div>
+      <div class="info-box">
+        ⚠ You'll be redirected to Stripe's secure checkout page to complete your card payment. Enter your details below first, then click "Continue to Payment".
       </div>
     </div>
 
@@ -676,60 +656,35 @@
   </div>
 
   <div class="config-notice">
-    <strong>⚙ Configuration required:</strong> Replace <code>YOUR_STRIPE_PUBLISHABLE_KEY</code> in the script, and set your Supabase <code>SUPABASE_URL</code> and <code>SUPABASE_ANON_KEY</code>. Update the bank account details above with your real account information. For Stripe payments, configure your backend endpoint to create Payment Intents.
+    <strong>⚙ Configuration required:</strong> Replace the <code>STRIPE_PAYMENT_LINKS</code> URLs below with your own Stripe Payment Links (one per plan/amount), and set your Supabase <code>SUPABASE_URL</code> and <code>SUPABASE_ANON_KEY</code>. Update the bank account details above with your real account information. No backend server is required &mdash; card payments redirect to Stripe-hosted checkout.
   </div>
 </div>
 
 <script>
   // ─── CONFIG — replace with your real values ───────────────────────────────
-  const STRIPE_PUBLISHABLE_KEY = 'YOUR_STRIPE_PUBLISHABLE_KEY';
-  const SUPABASE_URL = 'YOUR_SUPABASE_URL';
-  const SUPABASE_ANON_KEY = 'YOUR_SUPABASE_ANON_KEY';
+  //const SUPABASE_URL = 'YOUR_SUPABASE_URL';
+  //const SUPABASE_ANON_KEY = 'YOUR_SUPABASE_ANON_KEY';
+  const SUPABASE_URL = 'https://fwokjassyjtvqwihrgzi.supabase.co';
+  const SUPABASE_ANON_KEY = 'sb_publishable_SkXSZbWP5WZ-2-pwl9b1FA_Znct4zoN';
   const SUPABASE_BUCKET = 'payment-receipts';
   const SUPABASE_TABLE = 'transactions';
-  const PAYMENT_INTENT_ENDPOINT = '/api/create-payment-intent'; // your backend
+
+  // Stripe Payment Links — create one per plan/amount in your Stripe Dashboard
+  // (Payment Links > New). Keyed as "type:amount".
+  const STRIPE_PAYMENT_LINKS = {
+    'subscription:30': 'https://buy.stripe.com/test_6oU8wR5Ct0vJ2BG6f00Fi00',
+    'subscription:50': 'https://buy.stripe.com/YOUR_LINK_SUB_50',
+    'topup:20':         'https://buy.stripe.com/YOUR_LINK_TOPUP_20',
+    'topup:30':         'https://buy.stripe.com/YOUR_LINK_TOPUP_30',
+    'topup:50':         'https://buy.stripe.com/YOUR_LINK_TOPUP_50',
+    'topup:100':        'https://buy.stripe.com/YOUR_LINK_TOPUP_100',
+  };
   // ──────────────────────────────────────────────────────────────────────────
 
-  let stripe, cardElement;
   let currentType = 'subscription';
   let currentAmount = 30;
   let currentMethod = 'stripe';
   let selectedFile = null;
-
-  // Init Stripe
-  try {
-    if (STRIPE_PUBLISHABLE_KEY !== 'YOUR_STRIPE_PUBLISHABLE_KEY') {
-      stripe = Stripe(STRIPE_PUBLISHABLE_KEY);
-      const elements = stripe.elements({
-        appearance: {
-          theme: 'night',
-          variables: {
-            colorPrimary: '#3b82f6',
-            colorBackground: '#1a2235',
-            colorText: '#f0f6ff',
-            colorDanger: '#ef4444',
-            fontFamily: 'DM Sans, sans-serif',
-            borderRadius: '8px',
-          }
-        }
-      });
-      cardElement = elements.create('card', {
-        style: {
-          base: {
-            fontSize: '15px',
-            color: '#f0f6ff',
-            '::placeholder': { color: '#4a6480' }
-          }
-        }
-      });
-      cardElement.mount('#card-element');
-    } else {
-      document.getElementById('card-element').innerHTML =
-        '<div style="color:#4a6480;font-size:0.85rem;padding:8px 0;">Stripe card element will appear here after configuring your publishable key.</div>';
-    }
-  } catch(e) {
-    console.warn('Stripe init error:', e);
-  }
 
   function setType(type) {
     currentType = type;
@@ -784,7 +739,9 @@
     document.getElementById('sum-amount').textContent = `NZ$${currentAmount}.00`;
     document.getElementById('sum-method').textContent = methodLabel;
     document.getElementById('sum-total').textContent = `NZ$${currentAmount}.00`;
-    document.getElementById('btn-text').textContent = `Pay NZ$${currentAmount}.00`;
+    document.getElementById('btn-text').textContent = currentMethod === 'stripe'
+      ? `Continue to Payment — NZ$${currentAmount}.00`
+      : `Submit — NZ$${currentAmount}.00`;
   }
 
   function handleFileSelect(e) {
@@ -907,13 +864,50 @@
     const lastName = document.getElementById('last-name').value.trim();
     const email = document.getElementById('email').value.trim();
 
-    // Demo mode guard
-    const isDemo = STRIPE_PUBLISHABLE_KEY === 'YOUR_STRIPE_PUBLISHABLE_KEY'
-      || SUPABASE_URL === 'YOUR_SUPABASE_URL';
+    // ── Stripe: redirect to hosted Payment Link ──────────────────────────────
+    if (currentMethod === 'stripe') {
+      const linkKey = `${currentType}:${currentAmount}`;
+      const paymentLink = STRIPE_PAYMENT_LINKS[linkKey];
 
-    if (isDemo) {
+      if (!paymentLink || paymentLink.includes('YOUR_LINK')) {
+        showAlert('error', 'This payment option is not configured yet. Please contact us or choose Bank Transfer.');
+        return;
+      }
+
+      // Optionally record a pending transaction before handoff (if Supabase configured)
+      if (SUPABASE_URL !== 'YOUR_SUPABASE_URL') {
+        try {
+          await saveTransactionToSupabase({
+            first_name: firstName,
+            last_name: lastName,
+            email,
+            payment_type: currentType,
+            amount: currentAmount,
+            currency: 'NZD',
+            payment_method: 'stripe',
+            status: 'pending_redirect',
+            stripe_payment_id: null,
+            receipt_url: null,
+            created_at: new Date().toISOString()
+          });
+        } catch (err) {
+          console.warn('Could not log pending transaction:', err);
+        }
+      }
+
+      // Pre-fill customer email on Stripe's hosted page
+      const url = new URL(paymentLink);
+      if (email) url.searchParams.set('prefilled_email', email);
+
+      setLoading(true);
+      window.location.href = url.toString();
+      return;
+    }
+
+    // ── Bank transfer: upload receipt + save record ───────────────────────────
+    if (SUPABASE_URL === 'YOUR_SUPABASE_URL') {
       showAlert('success',
-        `✓ Demo mode: Payment of NZ$${currentAmount} via ${currentMethod === 'stripe' ? 'Stripe card' : 'bank transfer'} for ${email} recorded. Configure API keys for live payments.`
+        `✓ Demo mode: Bank transfer submission for ${email} recorded. Configure Supabase keys to enable live storage.`
       );
       return;
     }
@@ -921,44 +915,8 @@
     setLoading(true);
 
     try {
-      let receiptUrl = null;
-      let stripePaymentId = null;
+      const receiptUrl = await uploadToSupabase(selectedFile, email);
 
-      // ── Bank transfer: upload receipt ──────────────────────────────────────
-      if (currentMethod === 'bank') {
-        receiptUrl = await uploadToSupabase(selectedFile, email);
-      }
-
-      // ── Stripe card payment ────────────────────────────────────────────────
-      if (currentMethod === 'stripe') {
-        // 1. Create PaymentIntent on your backend
-        const intentRes = await fetch(PAYMENT_INTENT_ENDPOINT, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            amount: currentAmount * 100, // cents
-            currency: 'nzd',
-            type: currentType,
-            email
-          })
-        });
-
-        if (!intentRes.ok) throw new Error('Failed to create payment intent');
-        const { client_secret } = await intentRes.json();
-
-        // 2. Confirm card payment
-        const { paymentIntent, error } = await stripe.confirmCardPayment(client_secret, {
-          payment_method: {
-            card: cardElement,
-            billing_details: { name: `${firstName} ${lastName}`, email }
-          }
-        });
-
-        if (error) throw new Error(error.message);
-        stripePaymentId = paymentIntent.id;
-      }
-
-      // ── Save transaction to Supabase ───────────────────────────────────────
       const txData = {
         first_name: firstName,
         last_name: lastName,
@@ -966,9 +924,9 @@
         payment_type: currentType,
         amount: currentAmount,
         currency: 'NZD',
-        payment_method: currentMethod,
-        status: currentMethod === 'stripe' ? 'completed' : 'pending_verification',
-        stripe_payment_id: stripePaymentId,
+        payment_method: 'bank',
+        status: 'pending_verification',
+        stripe_payment_id: null,
         receipt_url: receiptUrl,
         created_at: new Date().toISOString()
       };
@@ -976,9 +934,7 @@
       await saveTransactionToSupabase(txData);
 
       showAlert('success',
-        currentMethod === 'stripe'
-          ? `✓ Payment of NZ$${currentAmount} successful! A confirmation will be sent to ${email}.`
-          : `✓ Receipt uploaded and transaction submitted. We'll verify your NZ$${currentAmount} transfer and confirm to ${email} within 1 business day.`
+        `✓ Receipt uploaded and transaction submitted. We'll verify your NZ$${currentAmount} transfer and confirm to ${email} within 1 business day.`
       );
 
       // Reset form
@@ -989,7 +945,7 @@
 
     } catch (err) {
       console.error(err);
-      showAlert('error', `Payment failed: ${err.message}`);
+      showAlert('error', `Submission failed: ${err.message}`);
     } finally {
       setLoading(false);
     }
