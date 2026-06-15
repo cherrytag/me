@@ -684,6 +684,11 @@
     <button class="btn-logout" id="btn-logout">Log out</button>
   </div>
 
+  <!-- Refund claim button (subscribers only) -->
+  <button class="scan-btn" id="btn-open-refund" style="display:none; background: var(--sky);" onclick="openRefundModal()">
+    💸 Request Refund
+  </button>
+
   <!-- ── SCANNER ───────────────────────────────── -->
   <div class="section-label">Scan & Earn</div>
 
@@ -807,90 +812,83 @@
   </div>
 </div>
 
+<!-- ═══ REFUND CLAIM MODAL ════════════════════════ -->
+<div class="modal-overlay" id="refund-modal">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <button class="modal-close" onclick="closeRefundModal()">✕</button>
+    <div class="modal-title">Request a Refund</div>
+    <div class="modal-sub">Submit your bank details to claim your refund</div>
+
+    <div id="form-refund">
+      <div class="field">
+        <label>Bank Account Number</label>
+        <input type="text" id="refund-bank-ac" placeholder="e.g. 12-3456-7890123-00" inputmode="numeric">
+      </div>
+      <div class="field">
+        <label>Bank Name</label>
+        <input type="text" id="refund-bank-name" placeholder="e.g. ANZ">
+      </div>
+      <div class="field">
+        <label>Bank Account Holder Name</label>
+        <input type="text" id="refund-bank-holder" placeholder="Full name on account">
+      </div>
+      <div class="field">
+        <label>Mobile Number</label>
+        <input type="tel" id="refund-mobile" placeholder="e.g. 021 234 5678" inputmode="tel">
+      </div>
+      <div class="field">
+        <label>Return Amount</label>
+        <input type="number" id="refund-amount" placeholder="0.00" min="0" step="0.01" inputmode="decimal">
+      </div>
+      <button class="btn-primary" onclick="submitRefundClaim()">Submit Claim</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ PIN VERIFICATION MODAL ════════════════════ -->
+<div class="modal-overlay" id="pin-modal">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <button class="modal-close" onclick="closePinModal()">✕</button>
+    <div class="modal-title">Verify Your Email</div>
+    <div class="modal-sub">Enter the 5-digit PIN sent to your email</div>
+
+    <div class="field">
+      <label>Verification PIN</label>
+      <input type="text" id="refund-pin" placeholder="•••••" maxlength="5" inputmode="numeric">
+    </div>
+    <button class="btn-primary" onclick="verifyRefundPin()">Verify & Submit</button>
+  </div>
+</div>
+
 <!-- Toast -->
 <div class="toast" id="toast"></div>
 
 <!-- ═══════════════════════════════════════════════
-     BACKEND SCRIPT — All DB interactions happen here
-     Using Supabase (free PostgreSQL + REST API)
 
-     ┌─ SETUP INSTRUCTIONS ──────────────────────────
-     │ 1. Go to https://supabase.com → New project
-     │ 2. Run the SQL in the <setup-sql> comment below
-     │ 3. Replace SUPABASE_URL + SUPABASE_ANON_KEY below
-     │ 4. In Supabase dashboard → Authentication → Settings
-     │    disable "Email confirmations" for easy testing
-       5.
-       cherry_db
-       DB password - tSqOopne42OR0XtG
-       URL  https://fwokjassyjtvqwihrgzi.supabase.co
-       KEY - sb_publishable_SkXSZbWP5WZ-2-pwl9b1FA_Znct4zoN
-     └───────────────────────────────────────────────
-
-     SETUP SQL (run in Supabase SQL Editor):
-     ─────────────────────────────────────────
-     CREATE TABLE cherry_db (
-       ID             INTEGER PRIMARY KEY,
-       USERID         TEXT UNIQUE NOT NULL,
-       email          TEXT UNIQUE NOT NULL,
-       pwd            TEXT NOT NULL,
-       POINTS         INT DEFAULT 0,
-       DATA1          TEXT,
-       DATA2          TEXT,
-       FUND1          REAL DEFAULT 0,
-       FUND2          REAL DEFAULT 0,
-       FUND3          REAL DEFAULT 0,
-       BANK_AC        INTEGER,
-       BANK_NAME      TEXT,
-       BANK_AC_HOLDER TEXT
-     );
-
-     CREATE TABLE stores (
-       id      bigint generated always as identity primary key,
-       name    TEXT NOT NULL,
-       lat     FLOAT NOT NULL,
-       lng     FLOAT NOT NULL,
-       address TEXT,
-       open    BOOLEAN DEFAULT TRUE
-     );
-
-     -- RLS policies
-     ALTER TABLE cherry_db ENABLE ROW LEVEL SECURITY;
-     ALTER TABLE stores ENABLE ROW LEVEL SECURITY;
-     CREATE POLICY "stores_public_read"   ON stores    FOR SELECT USING (true);
-     CREATE POLICY "cherry_db_own_read"   ON cherry_db FOR SELECT USING (USERID = current_setting('app.current_user_id', true));
-     CREATE POLICY "cherry_db_own_update" ON cherry_db FOR UPDATE USING (USERID = current_setting('app.current_user_id', true));
-     CREATE POLICY "cherry_db_insert"     ON cherry_db FOR INSERT WITH CHECK (true);
-
-     -- Sample stores (replace with real coordinates)
-     INSERT INTO stores (name, lat, lng, address) VALUES
-       ('Cherry Central',   -36.8485, 174.7633, '123 Queen St, Auckland'),
-       ('Cherry Newmarket', -36.8710, 174.7769, '45 Broadway, Newmarket'),
-       ('Cherry Ponsonby',  -36.8563, 174.7452, '189 Ponsonby Rd'),
-       ('Cherry Takapuna',  -36.7877, 174.7712, '12 Hurstmere Rd, Takapuna'),
-       ('Cherry Botany',    -36.9146, 174.9129, '588 Chapel Rd, Botany');
-     -- DATA1=reward title, DATA2=reward description, FUND1/2/3=financial fields
-     ─────────────────────────────────────────
 ════════════════════════════════════════════════ -->
 
 <script>
 // ═══ CONFIGURATION ═══════════════════════════════
-// Replace with your Supabase project URL and anon key
-//const SUPABASE_URL = 'https://YOUR_PROJECT.supabase.co'
-//const SUPABASE_ANON_KEY = 'YOUR_ANON_KEY_HERE'
+// All sensitive operations go through the Cloudflare Worker at cherrytag.org/api
+// Supabase is used ONLY for public reads (stores, token verification) using the anon key.
 
-const SUPABASE_URL = 'https://fwokjassyjtvqwihrgzi.supabase.co';
+const SUPABASE_URL     = 'https://fwokjassyjtvqwihrgzi.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_SkXSZbWP5WZ-2-pwl9b1FA_Znct4zoN';
 
-// ═══ INIT SUPABASE ════════════════════════════════
+// Cloudflare Worker base URL
+const WORKER_URL = 'https://cherrytag.org/api';
+
+// ═══ INIT SUPABASE (anon — read-only public data) ════════════
 const { createClient } = supabase;
 const db = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 // ═══ STATE ════════════════════════════════════════
-let currentUser = null;   // holds the full cherry_db row
-let qrStream = null;       // active MediaStream
-let qrAnimFrame = null;    // requestAnimationFrame handle
-let leafletMap = null;
+let currentUser    = null;
+let qrStream       = null;
+let qrAnimFrame    = null;
+let leafletMap     = null;
 
 // ═══ TOAST ════════════════════════════════════════
 function showToast(msg, type = '') {
@@ -898,6 +896,17 @@ function showToast(msg, type = '') {
   t.textContent = msg;
   t.className = 'toast show ' + type;
   setTimeout(() => t.className = 'toast', 3000);
+}
+
+// ═══ WORKER HELPER ════════════════════════════════
+async function workerPost(endpoint, body) {
+  const res = await fetch(WORKER_URL + endpoint, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  const data = await res.json().catch(() => ({}));
+  return { ok: res.ok, status: res.status, data };
 }
 
 // ═══ AUTH MODAL ═══════════════════════════════════
@@ -921,33 +930,26 @@ function switchTab(tab) {
   document.getElementById('form-signup').style.display = tab === 'signup' ? '' : 'none';
 }
 
-// ═══ SIGN IN ══════════════════════════════════════
-// Queries cherry_db matching email + pwd (plain PIN)
+// ═══ SIGN IN (via Worker) ══════════════════════════
 async function handleSignIn() {
   const email = document.getElementById('signin-email').value.trim().toLowerCase();
   const pin   = document.getElementById('signin-pin').value.trim();
 
   if (!email || !pin) { showToast('Please fill in all fields', 'error'); return; }
 
-  const { data, error } = await db
-    .from('cherry_db')
-    .select('*')
-    .eq('email', email)
-    .eq('pwd', pin)
-    .single();
+  const { ok, data } = await workerPost('/auth/signin', { email, pin });
 
-  if (error || !data) {
-    showToast('Invalid email or PIN', 'error');
+  if (!ok || !data.user) {
+    showToast(data.error || 'Invalid email or PIN', 'error');
     return;
   }
 
-  loginUser(data);
+  loginUser(data.user);
   closeAuthModal();
   showToast('Welcome back! 🍒', 'success');
 }
 
-// ═══ SIGN UP ══════════════════════════════════════
-// Inserts a new row into cherry_db
+// ═══ SIGN UP (via Worker) ══════════════════════════
 async function handleSignUp() {
   const name  = document.getElementById('signup-name').value.trim();
   const email = document.getElementById('signup-email').value.trim().toLowerCase();
@@ -956,64 +958,20 @@ async function handleSignUp() {
   if (!email || !pin) { showToast('Email and PIN are required', 'error'); return; }
   if (pin.length < 4)  { showToast('PIN must be at least 4 digits', 'error'); return; }
 
-  // Generate a unique USERID (UUID-style)
-  //const userid = crypto.randomUUID ? crypto.randomUUID()
-  //             : Date.now().toString(36) + Math.random().toString(36).slice(2);
-  const userid = generateRandom();
+  const { ok, status, data } = await workerPost('/auth/signup', { name, email, pin });
 
-  const id_text = userid.slice(4,8);
-  const id_int = parseInt(id_text, 10);
-
-  const { data, error } = await db
-    .from('cherry_db')
-    .insert({
-      id:             id_int,
-      userid:         userid,
-      email:          email,
-      pwd:            pin,
-      points:         0,
-      data1:          0,
-      data2:          0,
-      fund1:          0,
-      fund2:          0,
-      fund3:          0,
-      bank_ac:        1234,
-      bank_name:      'abc',
-      bank_ac_holder: 'xyz',
-    })
-    .select()
-    .single();
-
-  if (error) {
-    if (error.code === '23505') {
+  if (!ok) {
+    if (status === 409) {
       showToast('Email already registered. Sign in instead.', 'error');
     } else {
-      showToast('Sign up failed: ' + error.message, 'error');
+      showToast(data.error || 'Sign up failed', 'error');
     }
     return;
   }
 
-  loginUser(data);
+  loginUser(data.user);
   closeAuthModal();
   showToast('Account created! Welcome to Cherry 🍒', 'success');
-}
-//------ Generate userid ------
-
-function generateRandom() {
-  const upper = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
-  const lower = 'abcdefghijklmnopqrstuvwxyz';
-  const digits = '123456789';
-
-  const rand = (str, n) =>
-    Array.from({length: n}, () => str[Math.floor(Math.random() * str.length)]).join('');
-
-  const part1Capital  = rand(upper, 1);  // 1 capital letter
-  const part2Smalls   = rand(lower, 3);  // 3 small letters
-  const part3Numbers  = rand(digits, 4); // 4 numbers
-  const part4Smalls   = rand(lower, 5);  // 5 small letters
-  const part5Capitals = rand(upper, 2);  // 2 capital letters
-
-  return part1Capital + part2Smalls + part3Numbers + part4Smalls + part5Capitals;
 }
 
 // ═══ UPDATE REWARD DESC / REDEEMED LABEL ══════════
@@ -1026,30 +984,27 @@ function updateRewardDesc(user) {
 // ═══ LOGIN USER ═══════════════════════════════════
 function loginUser(user) {
   currentUser = user;
-  // Close auth modal on successful authentication
   closeAuthModal();
-  // Persist session by userid
   localStorage.setItem('cherry_userid', user.userid);
 
-  // Header button → show name or email prefix
   const displayName = user.email.split('@')[0];
   document.getElementById('btn-open-auth').textContent = displayName;
 
-  // User bar
   document.getElementById('user-bar').classList.add('visible');
   document.getElementById('user-display-name').textContent = displayName;
   document.getElementById('user-display-email').textContent = user.email;
 
-  // Reward card — DATA1=reward_points, data2=description
-  document.getElementById('reward-pts').textContent  = user.fund1 ?? 0;
+  document.getElementById('reward-pts').textContent   = user.fund1 ?? 0;
   document.getElementById('reward-title').textContent = user.email || 'Cherry Member';
   updateRewardDesc(user);
 
-  // Member QR code — encodes the userid
   const emailName = user.email.split('@')[0];
-  const qrValue = user.userid + '@' + emailName;
+  const qrValue   = user.userid + '@' + emailName;
   generateMemberQR(qrValue);
   document.getElementById('qr-label').textContent = emailName;
+
+  document.getElementById('btn-open-refund').style.display =
+    (user.data1 === 'sub') ? '' : 'none';
 }
 
 // ═══ LOGOUT ═══════════════════════════════════════
@@ -1058,6 +1013,7 @@ document.getElementById('btn-logout').addEventListener('click', () => {
   localStorage.removeItem('cherry_userid');
   document.getElementById('user-bar').classList.remove('visible');
   document.getElementById('btn-open-auth').textContent = 'Sign in';
+  document.getElementById('btn-open-refund').style.display = 'none';
   document.getElementById('reward-pts').textContent    = '–';
   document.getElementById('reward-title').textContent  = 'Welcome Reward';
   document.getElementById('reward-desc').textContent   = 'Sign in to unlock your rewards and start earning.';
@@ -1081,24 +1037,18 @@ function generateMemberQR(userid) {
   });
 }
 
-// ═══ QR SCANNER (cross-platform: BarcodeDetector + jsQR fallback) ═══════════
-// Uses native BarcodeDetector where available (Android Chrome, desktop Chrome/Edge)
-// Falls back to jsQR canvas scanning (iPhone Safari, Firefox, older browsers)
-
+// ═══ QR SCANNER ═══════════════════════════════════
 const SCAN_BTN_HTML = `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="5" height="5"/><rect x="16" y="3" width="5" height="5"/><rect x="3" y="16" width="5" height="5"/><line x1="21" y1="12" x2="21" y2="21"/><line x1="12" y1="3" x2="12" y2="12"/><line x1="12" y1="16" x2="12" y2="21"/><line x1="16" y1="12" x2="21" y2="12"/></svg> Scan Reward Code`;
 
 async function startScan() {
   const btn = document.getElementById('scan-btn');
   btn.textContent = 'Camera opening…';
   btn.disabled = true;
-
-  // Must stop any existing stream first
   stopStreamTracks();
 
   const container = document.getElementById('qr-reader-container');
   const video = document.getElementById('qr-video');
 
-  // Camera constraints — try rear camera, fall back to any camera
   const constraints = [
     { video: { facingMode: { exact: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } } },
     { video: { facingMode: 'environment',            width: { ideal: 1280 }, height: { ideal: 720 } } },
@@ -1127,27 +1077,21 @@ async function startScan() {
   btn.disabled = false;
   btn.onclick = stopScan;
 
-  // Choose scanning method
-  const hasBarcodeDetector = ('BarcodeDetector' in window);
-  if (hasBarcodeDetector) {
+  if ('BarcodeDetector' in window) {
     scanWithBarcodeDetector(video);
   } else {
     scanWithJsQR(video);
   }
 }
 
-// ── BarcodeDetector (Chrome/Android/desktop) ──────────────────────────────
 async function scanWithBarcodeDetector(video) {
   const detector = new BarcodeDetector({ formats: ['qr_code'] });
   async function tick() {
-    if (!qrStream) return; // stopped
+    if (!qrStream) return;
     if (video.readyState === video.HAVE_ENOUGH_DATA) {
       try {
         const codes = await detector.detect(video);
-        if (codes.length > 0) {
-          await onQRCodeScanned(codes[0].rawValue);
-          return;
-        }
+        if (codes.length > 0) { await onQRCodeScanned(codes[0].rawValue); return; }
       } catch(e) {}
     }
     qrAnimFrame = requestAnimationFrame(tick);
@@ -1155,32 +1099,24 @@ async function scanWithBarcodeDetector(video) {
   qrAnimFrame = requestAnimationFrame(tick);
 }
 
-// ── jsQR canvas scan (iPhone Safari, Firefox, etc.) ──────────────────────
 function scanWithJsQR(video) {
   const canvas = document.getElementById('qr-canvas');
   const ctx = canvas.getContext('2d');
-
   function tick() {
-    if (!qrStream) return; // stopped
+    if (!qrStream) return;
     if (video.readyState === video.HAVE_ENOUGH_DATA) {
       canvas.width  = video.videoWidth;
       canvas.height = video.videoHeight;
       ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
       const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-      const code = jsQR(imageData.data, imageData.width, imageData.height, {
-        inversionAttempts: 'dontInvert'
-      });
-      if (code) {
-        onQRCodeScanned(code.data);
-        return;
-      }
+      const code = jsQR(imageData.data, imageData.width, imageData.height, { inversionAttempts: 'dontInvert' });
+      if (code) { onQRCodeScanned(code.data); return; }
     }
     qrAnimFrame = requestAnimationFrame(tick);
   }
   qrAnimFrame = requestAnimationFrame(tick);
 }
 
-// ── Stop helpers ──────────────────────────────────────────────────────────
 function stopStreamTracks() {
   if (qrAnimFrame) { cancelAnimationFrame(qrAnimFrame); qrAnimFrame = null; }
   if (qrStream) { qrStream.getTracks().forEach(t => t.stop()); qrStream = null; }
@@ -1206,7 +1142,6 @@ function stopScanSilent() {
 
 async function onQRCodeScanned(decodedText) {
   stopScanSilent();
-
   if (!currentUser) {
     showToast('Please sign in first', 'error');
     document.getElementById('auth-modal').classList.add('active');
@@ -1217,12 +1152,9 @@ async function onQRCodeScanned(decodedText) {
   const iconEl   = document.getElementById('scan-result-icon');
   const textEl   = document.getElementById('scan-result-text');
 
-  // Check QR format to determine operation type
   if (decodedText.includes('$')) {
-    // EARN REWARD: f_userid$provider_name$reward$cherry_code
     await handleEarnReward(decodedText, resultEl, iconEl, textEl);
   } else if (decodedText.includes('@')) {
-    // TRANSFER REWARD: r_userid@receiver_name
     await handleTransferReward(decodedText, resultEl, iconEl, textEl);
   } else {
     iconEl.textContent = '❌';
@@ -1231,77 +1163,44 @@ async function onQRCodeScanned(decodedText) {
   }
 }
 
+// ── Earn Reward ────────────────────────────────────────────────────────────
 async function handleEarnReward(scannedData, resultEl, iconEl, textEl) {
   try {
     const parts = scannedData.split('$');
     if (parts.length !== 4) {
       iconEl.textContent = '❌';
-      textEl.textContent = 'Invalid earn reward QR format.\nExpected: userid$provider$reward$code';
+      textEl.textContent = 'Invalid earn reward QR format.';
       resultEl.classList.add('show');
       return;
     }
 
     const [f_userid, provider_name, reward, cherry_code] = parts;
-    const rewardFloat = parseFloat(reward);
+    const rewardFloat      = parseFloat(reward);
+    const rewardNoDecimal  = reward.replace('.', '');
+    const idtoken          = cherry_code + rewardNoDecimal;
 
-    // Create idtoken: cherry_code + reward (without decimal)
-    const rewardNoDecimal = reward.replace('.', '');
-    const idtoken = cherry_code + rewardNoDecimal;
-
-    // Debug: Show scanned values
-    console.log('=== EARN REWARD DEBUG ===');
-    console.log('Scanned Data:', scannedData);
-    console.log('f_userid:', f_userid);
-    console.log('provider_name:', provider_name);
-    console.log('reward:', reward, '| rewardNoDecimal:', rewardNoDecimal);
-    console.log('cherry_code:', cherry_code);
-    console.log('Final idtoken:', idtoken, '| Type:', typeof idtoken);
-
-    // Verify idtoken in cherry_token_db
+    // Token verification uses Supabase anon key (public read via RLS)
     const { data: tokenRecord, error } = await db
       .from('cherry_token_db')
       .select('*')
       .eq('idtoken', idtoken)
       .single();
 
-    console.log('DB Query Result:', { tokenRecord, error });
-
     if (error || !tokenRecord) {
-      // Try alternative query to find matching records
-      const { data: allTokens, error: allError } = await db
-        .from('cherry_token_db')
-        .select('idtoken')
-        .limit(5);
-
-      let debugMsg = `❌ VERIFICATION FAILED\n\nSearching for:\n${idtoken}\n\n`;
-      
-      if (allError) {
-        debugMsg += `DB Error: ${allError.message}`;
-      } else if (allTokens && allTokens.length > 0) {
-        debugMsg += `Sample tokens in DB:\n${allTokens.map(t => t.idtoken).join('\n')}\n\nMismatch detected!`;
-      } else {
-        debugMsg += `No tokens found in database`;
-      }
-
       iconEl.textContent = '❌';
-      textEl.innerHTML = debugMsg.replace(/\n/g, '<br>');
+      textEl.textContent = 'Verification failed. QR code not recognised.';
       resultEl.classList.add('show');
       return;
     }
 
-    // Store for confirmation (no DOM refs — look them up fresh when needed)
-    window.pendingEarnData = {
-      f_userid,
-      provider_name,
-      reward: rewardFloat,
-      idtoken
-    };
+    window.pendingEarnData = { f_userid, provider_name, reward: rewardFloat, idtoken };
 
-    // Show confirmation with explicit button — no setTimeout (unreliable on iPhone Safari)
     iconEl.textContent = '✅';
-    textEl.innerHTML = `<strong>${provider_name}</strong><br>${rewardFloat.toFixed(2)} points`;
+    textEl.innerHTML   = `<strong>${provider_name}</strong><br>${rewardFloat.toFixed(2)} points`;
+
     const oldBtn = document.getElementById('earn-confirm-btn');
     if (oldBtn) oldBtn.remove();
+
     const confirmBtn = document.createElement('button');
     confirmBtn.id = 'earn-confirm-btn';
     confirmBtn.textContent = 'Confirm & Earn';
@@ -1311,9 +1210,8 @@ async function handleEarnReward(scannedData, resultEl, iconEl, textEl) {
     resultEl.classList.add('show');
 
   } catch (err) {
-    console.error('Earn reward error:', err);
     iconEl.textContent = '❌';
-    textEl.innerHTML = `Error processing reward<br><small>${err.message}</small>`;
+    textEl.innerHTML   = `Error processing reward<br><small>${err.message}</small>`;
     resultEl.classList.add('show');
   }
 }
@@ -1327,35 +1225,23 @@ async function confirmEarnRewardFromQR() {
   const textEl   = document.getElementById('scan-result-text');
 
   try {
-    const transId = 'TXN-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
+    const transId         = 'TXN-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
     const currentTimestamp = new Date().toISOString();
 
-    // Update cherry_token_db
     const { error: updateError } = await db
       .from('cherry_token_db')
-      .update({
-        f_userid: f_userid,
-        r_userid: currentUser.userid,
-        t_fund1: reward,
-        time: currentTimestamp,
-        trans_id: transId
-      })
+      .update({ f_userid, r_userid: currentUser.userid, t_fund1: reward, time: currentTimestamp, trans_id: transId })
       .eq('idtoken', idtoken);
 
-    if (updateError) {
-      throw updateError;
-    }
+    if (updateError) throw updateError;
 
-    // Update current user's points
     const newPoints = (currentUser.fund1 || 0) + reward;
     const { error: pointsError } = await db
       .from('cherry_db')
       .update({ fund1: newPoints })
       .eq('userid', currentUser.userid);
 
-    if (pointsError) {
-      throw pointsError;
-    }
+    if (pointsError) throw pointsError;
 
     currentUser.fund1 = newPoints;
     document.getElementById('reward-pts').textContent = newPoints;
@@ -1363,18 +1249,17 @@ async function confirmEarnRewardFromQR() {
     iconEl.textContent = '🍒';
     textEl.textContent = 'Reward claimed successfully!';
     resultEl.classList.add('show');
-
     showToast('Reward claimed successfully', 'success');
     window.pendingEarnData = null;
 
   } catch (err) {
-    console.error('Confirm earn error:', err);
     iconEl.textContent = '❌';
     textEl.textContent = 'Failed to claim reward.';
     showToast('Error claiming reward', 'error');
   }
 }
 
+// ── Transfer Reward ────────────────────────────────────────────────────────
 async function handleTransferReward(scannedData, resultEl, iconEl, textEl) {
   try {
     const parts = scannedData.split('@');
@@ -1387,7 +1272,6 @@ async function handleTransferReward(scannedData, resultEl, iconEl, textEl) {
 
     const [r_userid, receiver_name] = parts;
 
-    // Verify receiver exists
     const { data: receiver, error: receiverError } = await db
       .from('cherry_db')
       .select('userid')
@@ -1401,7 +1285,6 @@ async function handleTransferReward(scannedData, resultEl, iconEl, textEl) {
       return;
     }
 
-    // Check for pending transfers (idtokens: 999999900250, 999999900500, 999999901000)
     const pendingIdtokens = ['999999900250', '999999900500', '999999901000'];
     const { data: pendingTransfers } = await db
       .from('cherry_token_db')
@@ -1410,25 +1293,23 @@ async function handleTransferReward(scannedData, resultEl, iconEl, textEl) {
       .eq('f_userid', currentUser.userid);
 
     const hasPendingTransfer = pendingTransfers && pendingTransfers.length > 0;
-
-    // Store for subsequent selection (no DOM refs — look them up fresh when needed)
-    window.pendingTransferData = {
-      r_userid,
-      receiver_name,
-      hasPendingTransfer
-    };
+    window.pendingTransferData = { r_userid, receiver_name, hasPendingTransfer };
 
     if (hasPendingTransfer) {
       iconEl.textContent = '⏳';
-      textEl.textContent = `${receiver_name}\n\nPrevious transaction processing\nTry again after sometime`;
+      textEl.textContent = `${receiver_name}
+
+Previous transaction processing
+Try again after sometime`;
     } else {
       iconEl.textContent = '✅';
-      textEl.textContent = `Wish to transfer:\n2.50 or 5.00 or 10.00 points to \n: ${receiver_name}`;
+      textEl.textContent = `Wish to transfer:
+2.50 or 5.00 or 10.00 points to 
+: ${receiver_name}`;
     }
     resultEl.classList.add('show');
 
   } catch (err) {
-    console.error('Transfer reward error:', err);
     iconEl.textContent = '❌';
     textEl.textContent = 'Error processing transfer.';
     resultEl.classList.add('show');
@@ -1444,16 +1325,9 @@ async function confirmTransferRewardFromQR(amount) {
   const textEl   = document.getElementById('scan-result-text');
 
   try {
-    // Map amount to idtoken
-    const idtokenMap = {
-      2.50: '999999900250',
-      5.00: '999999900500',
-      10.00: '999999901000'
-    };
+    const idtokenMap = { 2.50: '999999900250', 5.00: '999999900500', 10.00: '999999901000' };
+    const idtoken    = idtokenMap[amount];
 
-    const idtoken = idtokenMap[amount];
-
-    // Verify idtoken in cherry_token_db
     const { data: tokenRecord, error } = await db
       .from('cherry_token_db')
       .select('*')
@@ -1467,106 +1341,76 @@ async function confirmTransferRewardFromQR(amount) {
       return;
     }
 
-    const transId = 'TXN-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
-    const currentTimestamp = new Date().toISOString();
+    const transId          = 'TXN-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
+    const currentTimestamp  = new Date().toISOString();
 
-    // Update cherry_token_db
     const { error: updateError } = await db
       .from('cherry_token_db')
-      .update({
-        f_userid: currentUser.userid,
-        r_userid: r_userid,
-        t_fund1: amount,
-        time: currentTimestamp,
-        trans_id: transId
-      })
+      .update({ f_userid: currentUser.userid, r_userid, t_fund1: amount, time: currentTimestamp, trans_id: transId })
       .eq('idtoken', idtoken);
 
-    if (updateError) {
-      throw updateError;
-    }
+    if (updateError) throw updateError;
 
-    // Deduct points from current user
     const newPoints = (currentUser.fund1 || 0) - amount;
     const { error: pointsError } = await db
       .from('cherry_db')
       .update({ fund1: newPoints })
       .eq('userid', currentUser.userid);
 
-    if (pointsError) {
-      throw pointsError;
-    }
+    if (pointsError) throw pointsError;
 
     currentUser.fund1 = newPoints;
     document.getElementById('reward-pts').textContent = newPoints;
 
     iconEl.textContent = '🍒';
-    textEl.textContent = `Transfer successful!\n\n${amount.toFixed(2)} points to ${receiver_name}`;
-    resultEl.classList.add('show');
+    textEl.textContent = `Transfer successful!
 
+${amount.toFixed(2)} points to ${receiver_name}`;
+    resultEl.classList.add('show');
     showToast('Transfer successful', 'success');
     window.pendingTransferData = null;
 
   } catch (err) {
-    console.error('Confirm transfer error:', err);
     iconEl.textContent = '❌';
     textEl.textContent = 'Failed to transfer reward.';
     showToast('Error transferring reward', 'error');
   }
 }
 
-
 function closeScanResult() {
-  // If transfer is pending and waiting for amount selection, don't close
   if (window.pendingTransferData && !window.pendingTransferData.selected) {
-    // Show transfer amount options
     const resultEl = document.getElementById('scan-result');
-    const iconEl   = document.getElementById('scan-result-icon');
-    const textEl   = document.getElementById('scan-result-text');
-    
-    // Show amount selection with buttons (using result overlay)
     resultEl.innerHTML = `
-      <div style="text-align: center; background: white; padding: 32px 24px; border-radius: 20px; max-width: 360px;">
-        <div style="font-size: 14px; color: #7A6065; margin-bottom: 24px;">Select amount to transfer to </div>
-        <div style="font-family: 'Playfair Display', serif; font-size: 22px; color: #C0152A; margin-bottom: 8px;">${window.pendingTransferData.receiver_name}</div>
-        <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-bottom: 20px;">
-          <button onclick="confirmTransferRewardFromQR(2.50)" style="padding: 12px; border: 2px solid #EAD9DC; background: transparent; border-radius: 12px; font-weight: 600; cursor: pointer; transition: all 0.2s;" onmouseover="this.style.borderColor='#C0152A'; this.style.background='rgba(192,21,42,0.05)'" onmouseout="this.style.borderColor='#EAD9DC'; this.style.background='transparent'">2.50</button>
-          <button onclick="confirmTransferRewardFromQR(5.00)" style="padding: 12px; border: 2px solid #EAD9DC; background: transparent; border-radius: 12px; font-weight: 600; cursor: pointer; transition: all 0.2s;" onmouseover="this.style.borderColor='#C0152A'; this.style.background='rgba(192,21,42,0.05)'" onmouseout="this.style.borderColor='#EAD9DC'; this.style.background='transparent'">5.00</button>
-          <button onclick="confirmTransferRewardFromQR(10.00)" style="padding: 12px; border: 2px solid #EAD9DC; background: transparent; border-radius: 12px; font-weight: 600; cursor: pointer; transition: all 0.2s;" onmouseover="this.style.borderColor='#C0152A'; this.style.background='rgba(192,21,42,0.05)'" onmouseout="this.style.borderColor='#EAD9DC'; this.style.background='transparent'">10.00</button>
+      <div style="text-align:center;background:white;padding:32px 24px;border-radius:20px;max-width:360px;">
+        <div style="font-size:14px;color:#7A6065;margin-bottom:24px;">Select amount to transfer to</div>
+        <div style="font-family:'Playfair Display',serif;font-size:22px;color:#C0152A;margin-bottom:8px;">${window.pendingTransferData.receiver_name}</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:20px;">
+          <button onclick="confirmTransferRewardFromQR(2.50)" style="padding:12px;border:2px solid #EAD9DC;background:transparent;border-radius:12px;font-weight:600;cursor:pointer;">2.50</button>
+          <button onclick="confirmTransferRewardFromQR(5.00)" style="padding:12px;border:2px solid #EAD9DC;background:transparent;border-radius:12px;font-weight:600;cursor:pointer;">5.00</button>
+          <button onclick="confirmTransferRewardFromQR(10.00)" style="padding:12px;border:2px solid #EAD9DC;background:transparent;border-radius:12px;font-weight:600;cursor:pointer;">10.00</button>
         </div>
-        <button onclick="document.getElementById('scan-result').classList.remove('show'); window.pendingTransferData = null;" style="width: 100%; padding: 12px; background: #EAD9DC; border: none; border-radius: 12px; font-weight: 600; cursor: pointer; color: #1A0A0E;">Cancel Transfer</button>
-      </div>
-    `;
+        <button onclick="document.getElementById('scan-result').classList.remove('show');window.pendingTransferData=null;" style="width:100%;padding:12px;background:#EAD9DC;border:none;border-radius:12px;font-weight:600;cursor:pointer;color:#1A0A0E;">Cancel Transfer</button>
+      </div>`;
     return;
   }
-  
   document.getElementById('scan-result').classList.remove('show');
-  if (!currentUser) {
-    document.getElementById('auth-modal').classList.add('active');
-  }
+  if (!currentUser) document.getElementById('auth-modal').classList.add('active');
 }
 
 // ═══ MAP (MapLibre GL + OpenFreeMap) ══════════════
 function initMap(lat, lng) {
   if (leafletMap) { leafletMap.remove(); leafletMap = null; }
-
   leafletMap = new maplibregl.Map({
     container: 'map',
     style: 'https://tiles.openfreemap.org/styles/liberty',
-    center: [lng, lat],   // MapLibre uses [lng, lat]
+    center: [lng, lat],
     zoom: 13,
     attributionControl: true,
   });
-
   leafletMap.addControl(new maplibregl.NavigationControl(), 'top-right');
 
-  // User location pulse marker
   const userEl = document.createElement('div');
-  userEl.innerHTML = `
-    <div style="position:relative;width:20px;height:20px;">
-      <div style="position:absolute;inset:0;background:rgba(192,21,42,0.25);border-radius:50%;animation:map-pulse 1.8s ease-out infinite;"></div>
-      <div style="position:absolute;top:3px;left:3px;width:14px;height:14px;background:#C0152A;border:2.5px solid #fff;border-radius:50%;box-shadow:0 2px 8px rgba(192,21,42,0.6);"></div>
-    </div>`;
+  userEl.innerHTML = `<div style="position:relative;width:20px;height:20px;"><div style="position:absolute;inset:0;background:rgba(192,21,42,0.25);border-radius:50%;animation:map-pulse 1.8s ease-out infinite;"></div><div style="position:absolute;top:3px;left:3px;width:14px;height:14px;background:#C0152A;border:2.5px solid #fff;border-radius:50%;box-shadow:0 2px 8px rgba(192,21,42,0.6);"></div></div>`;
   new maplibregl.Marker({ element: userEl })
     .setLngLat([lng, lat])
     .setPopup(new maplibregl.Popup({ offset: 14 }).setHTML('<b style="font-family:DM Sans,sans-serif">You are here</b>'))
@@ -1577,20 +1421,14 @@ function initMap(lat, lng) {
 
 async function loadStoreMarkers(userLat, userLng) {
   const { data: stores, error } = await db.from('stores').select('*');
+  if (error || !stores) { showToast('Could not load store locations', 'error'); return; }
 
-  if (error || !stores) {
-    showToast('Could not load store locations', 'error');
-    return;
-  }
-
-  // Haversine filter — 8 km radius
   const R = 6371;
   const withinRadius = stores.filter(store => {
     const dLat = (store.lat - userLat) * Math.PI / 180;
     const dLng = (store.lng - userLng) * Math.PI / 180;
     const a = Math.sin(dLat/2)**2 +
-              Math.cos(userLat * Math.PI/180) * Math.cos(store.lat * Math.PI/180) *
-              Math.sin(dLng/2)**2;
+              Math.cos(userLat * Math.PI/180) * Math.cos(store.lat * Math.PI/180) * Math.sin(dLng/2)**2;
     return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)) <= 8;
   });
 
@@ -1598,7 +1436,6 @@ async function loadStoreMarkers(userLat, userLng) {
     `${withinRadius.length} store${withinRadius.length !== 1 ? 's' : ''} within 8 km`;
 
   withinRadius.forEach(store => {
-    // Custom cherry marker element
     const el = document.createElement('div');
     el.title = store.name;
     el.innerHTML = `<div style="width:32px;height:32px;background:#C0152A;border:2.5px solid #fff;border-radius:50%;display:flex;align-items:center;justify-content:center;box-shadow:0 3px 12px rgba(192,21,42,0.55);font-size:16px;cursor:pointer;transition:transform 0.15s;">🍒</div>`;
@@ -1606,43 +1443,24 @@ async function loadStoreMarkers(userLat, userLng) {
     el.addEventListener('mouseleave', () => el.firstElementChild.style.transform = 'scale(1)');
 
     const popup = new maplibregl.Popup({ offset: 18, closeButton: false })
-      .setHTML(`
-        <div style="font-family:'DM Sans',sans-serif;min-width:160px;padding:2px 0;">
-          <div style="font-weight:700;font-size:14px;margin-bottom:3px;">${store.name}</div>
-          <div style="font-size:12px;color:#7A6065;">${store.address || ''}</div>
-          <div style="margin-top:6px;font-size:11px;font-weight:600;color:${store.open ? '#22C55E' : '#C0152A'};">
-            ${store.open ? '● Open now' : '● Closed'}
-          </div>
-        </div>`);
+      .setHTML(`<div style="font-family:'DM Sans',sans-serif;min-width:160px;padding:2px 0;"><div style="font-weight:700;font-size:14px;margin-bottom:3px;">${store.name}</div><div style="font-size:12px;color:#7A6065;">${store.address || ''}</div><div style="margin-top:6px;font-size:11px;font-weight:600;color:${store.open ? '#22C55E' : '#C0152A'};">${store.open ? '● Open now' : '● Closed'}</div></div>`);
 
     new maplibregl.Marker({ element: el })
       .setLngLat([store.lng, store.lat])
       .setPopup(popup)
       .addTo(leafletMap);
-
-    // Show popup on hover
-    el.addEventListener('mouseenter', () => {
-      const marker = leafletMap._markers?.find(m => m.getLngLat().lng === store.lng);
-    });
   });
 }
 
-// Request GPS permission and init map
 function requestLocationAndInitMap() {
   if (!navigator.geolocation) {
-    // Fallback to Auckland CBD
     initMap(-36.8485, 174.7633);
     showToast('Geolocation not supported — showing Auckland');
     return;
   }
-
   navigator.geolocation.getCurrentPosition(
     pos => initMap(pos.coords.latitude, pos.coords.longitude),
-    err => {
-      console.warn('Location denied:', err);
-      initMap(-36.8485, 174.7633); // Auckland fallback
-      showToast('Location access denied — showing Auckland CBD');
-    },
+    err => { initMap(-36.8485, 174.7633); showToast('Location access denied — showing Auckland CBD'); },
     { timeout: 8000, enableHighAccuracy: false }
   );
 }
@@ -1660,7 +1478,6 @@ async function restoreSession() {
 
   if (data) loginUser(data);
 
-  // Poll for fund2 updates (e.g. redemptions applied externally)
   setInterval(async () => {
     if (!currentUser) return;
     const { data: refreshed, error: refreshError } = await db
@@ -1668,7 +1485,6 @@ async function restoreSession() {
       .select('fund2, data2')
       .eq('userid', currentUser.userid)
       .single();
-
     if (!refreshError && refreshed) {
       currentUser.fund2 = refreshed.fund2;
       currentUser.data2 = refreshed.data2;
@@ -1677,7 +1493,155 @@ async function restoreSession() {
   }, 5000);
 }
 
-// ═══ INIT ═════════════════════════════════════════
+// ═══ REFUND CLAIM FEATURE ═════════════════════════
+let pendingRefund = null;
+
+document.getElementById('refund-modal').addEventListener('click', function(e) {
+  if (e.target === this) closeRefundModal();
+});
+document.getElementById('pin-modal').addEventListener('click', function(e) {
+  if (e.target === this) closePinModal();
+});
+
+async function openRefundModal() {
+  if (!currentUser) {
+    showToast('Please sign in first', 'error');
+    document.getElementById('auth-modal').classList.add('active');
+    return;
+  }
+  if (currentUser.data1 !== 'sub') {
+    showToast('This feature is available to subscribers only', 'error');
+    return;
+  }
+
+  const { data, error } = await db
+    .from('cherry_db')
+    .select('data2')
+    .eq('userid', currentUser.userid)
+    .single();
+
+  if (error) { showToast('Could not check refund status', 'error'); return; }
+
+  currentUser.data2 = data.data2;
+
+  if (data.data2 !== '0' && data.data2 !== 0 && data.data2 !== null && data.data2 !== '') {
+    showToast('A refund is already under progress', 'error');
+    return;
+  }
+
+  document.getElementById('refund-bank-ac').value     = currentUser.bank_ac ?? '';
+  document.getElementById('refund-bank-name').value   = currentUser.bank_name ?? '';
+  document.getElementById('refund-bank-holder').value = currentUser.bank_ac_holder ?? '';
+  document.getElementById('refund-mobile').value      = '';
+  document.getElementById('refund-amount').value      = '';
+  document.getElementById('refund-modal').classList.add('active');
+}
+
+function closeRefundModal() {
+  document.getElementById('refund-modal').classList.remove('active');
+}
+
+function closePinModal() {
+  document.getElementById('pin-modal').classList.remove('active');
+  document.getElementById('refund-pin').value = '';
+}
+
+function generateFiveDigitPin() {
+  return String(Math.floor(Math.random() * 100000)).padStart(5, '0');
+}
+
+async function submitRefundClaim() {
+  if (!currentUser) { showToast('Please sign in first', 'error'); return; }
+
+  const bank_ac     = document.getElementById('refund-bank-ac').value.trim();
+  const bank_name   = document.getElementById('refund-bank-name').value.trim();
+  const bank_holder = document.getElementById('refund-bank-holder').value.trim();
+  const mobile      = document.getElementById('refund-mobile').value.trim();
+  const amountRaw   = document.getElementById('refund-amount').value.trim();
+  const amount      = parseFloat(amountRaw);
+
+  if (!bank_ac || !bank_name || !bank_holder || !mobile || !amountRaw) {
+    showToast('Please fill in all fields', 'error'); return;
+  }
+  if (isNaN(amount) || amount <= 0) {
+    showToast('Please enter a valid return amount', 'error'); return;
+  }
+
+  const { data, error } = await db
+    .from('cherry_db')
+    .select('data2')
+    .eq('userid', currentUser.userid)
+    .single();
+
+  if (error) { showToast('Could not verify refund status', 'error'); return; }
+  if (data.data2 !== '0' && data.data2 !== 0 && data.data2 !== null && data.data2 !== '') {
+    showToast('A refund is already under progress', 'error');
+    closeRefundModal(); return;
+  }
+
+  const pin = generateFiveDigitPin();
+  pendingRefund = { bank_ac, bank_name, bank_holder, mobile, amount, pin };
+
+  // Send PIN via Worker → Resend
+  const { ok } = await workerPost('/email/send', {
+    to: currentUser.email,
+    subject: 'Your Cherry Refund Verification PIN',
+    body: `Your verification PIN for the refund request is: ${pin}
+
+Enter this PIN in the app to confirm your refund claim of ${amount.toFixed(2)}.
+
+If you did not request this, please ignore this email.`,
+  });
+
+  if (!ok) {
+    showToast('Failed to send verification email. Please try again.', 'error');
+    pendingRefund = null; return;
+  }
+
+  closeRefundModal();
+  document.getElementById('pin-modal').classList.add('active');
+  showToast('A 5-digit PIN has been sent to your email', 'success');
+}
+
+async function verifyRefundPin() {
+  if (!pendingRefund) { showToast('No pending refund request', 'error'); closePinModal(); return; }
+
+  const enteredPin = document.getElementById('refund-pin').value.trim();
+  if (enteredPin !== pendingRefund.pin) { showToast('Incorrect PIN. Please try again.', 'error'); return; }
+
+  const { bank_ac, bank_name, bank_holder, mobile, amount } = pendingRefund;
+  const data2Value = `${bank_ac}$${bank_name}$${bank_holder}$${amount}$${mobile}`;
+
+  const { error } = await db
+    .from('cherry_db')
+    .update({ data2: data2Value })
+    .eq('userid', currentUser.userid);
+
+  if (error) { showToast('Failed to submit refund claim: ' + error.message, 'error'); return; }
+
+  currentUser.data2 = data2Value;
+  updateRewardDesc(currentUser);
+
+  // Send confirmation email via Worker
+  await workerPost('/email/send', {
+    to: currentUser.email,
+    subject: 'Cherry Refund Claim Submitted',
+    body: `Your refund claim has been submitted successfully:
+
+Bank Account: ${bank_ac}
+Bank Name: ${bank_name}
+Account Holder: ${bank_holder}
+Return Amount: ${amount.toFixed(2)}
+Mobile Number: ${mobile}
+
+We will process your refund shortly.`,
+  });
+
+  closePinModal();
+  pendingRefund = null;
+  showToast('Refund claim submitted successfully! 🍒', 'success');
+}
+
 document.addEventListener('DOMContentLoaded', async () => {
   await restoreSession();
   requestLocationAndInitMap();
