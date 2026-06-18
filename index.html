@@ -535,6 +535,38 @@
   }
   .btn-primary:hover { background: var(--cherry-dark); }
 
+  .btn-secondary {
+    width: 100%;
+    background: transparent;
+    color: var(--cherry);
+    border: 1.5px solid var(--cherry);
+    border-radius: 14px;
+    padding: 13px;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.18s;
+  }
+  .btn-secondary:hover { background: var(--cherry); color: #fff; }
+
+  .btn-link {
+    background: none;
+    border: none;
+    color: var(--cherry);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    text-decoration: none;
+    padding: 0;
+    margin-top: 12px;
+    text-align: center;
+    width: 100%;
+    transition: color 0.15s;
+  }
+  .btn-link:hover { color: var(--cherry-dark); text-decoration: underline; }
+
   .modal-close {
     position: absolute;
     top: 18px;
@@ -705,49 +737,30 @@
     </div>
     <div class="live-indicator">
       <div class="live-dot"></div>
-      <span class="live-text">Live</span>
+      <div class="live-text">LIVE</div>
     </div>
-    <!-- QR Reader: video + hidden canvas for jsQR -->
     <div id="qr-reader-container">
-      <video id="qr-video" autoplay playsinline muted></video>
+      <video id="qr-video" playsinline></video>
       <canvas id="qr-canvas"></canvas>
     </div>
-    <!-- Scan result overlay -->
     <div class="scan-result" id="scan-result">
-      <div class="scan-result-icon" id="scan-result-icon">✅</div>
-      <div class="scan-result-text" id="scan-result-text">QR Code validated!</div>
-      <button class="btn-auth" style="background:#fff;color:var(--cherry);border-color:#fff;" onclick="closeScanResult()">Ok</button>
+      <div class="scan-result-icon" id="scan-result-icon">✓</div>
+      <div class="scan-result-text" id="scan-result-text">Scanned!</div>
     </div>
   </div>
 
   <button class="scan-btn" id="scan-btn" onclick="startScan()">
-    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-      <rect x="3" y="3" width="5" height="5"/><rect x="16" y="3" width="5" height="5"/>
-      <rect x="3" y="16" width="5" height="5"/>
-      <line x1="21" y1="12" x2="21" y2="21"/><line x1="12" y1="3" x2="12" y2="12"/>
-      <line x1="12" y1="16" x2="12" y2="21"/><line x1="16" y1="12" x2="21" y2="12"/>
-    </svg>
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="5" height="5"/><rect x="16" y="3" width="5" height="5"/><rect x="3" y="16" width="5" height="5"/><line x1="21" y1="12" x2="21" y2="21"/><line x1="12" y1="3" x2="12" y2="12"/><line x1="12" y1="16" x2="12" y2="21"/><line x1="16" y1="12" x2="21" y2="12"/></svg>
     Scan Reward Code
   </button>
 
-  <button class="scan-btn" id="btn-open-coupon" style="display:none; background: var(--cherry-light); margin-top: 10px;" onclick="openCouponPage()">
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-      <path d="M3 9a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v1a1.5 1.5 0 0 0 0 3v1a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-1a1.5 1.5 0 0 0 0-3V9z"/>
-      <line x1="9" y1="7" x2="9" y2="17" stroke-dasharray="2 2"/>
-    </svg>
-    Coupon
-  </button>
-
-  <!-- ── REWARD + QR CARD ───────────────────────── -->
+  <!-- ── REWARD CARD ───────────────────────────── -->
   <div class="section-label">Your Rewards</div>
 
-  <div class="reward-card" id="reward-card">
+  <div class="reward-card">
     <div class="reward-left">
       <div>
-        <div class="reward-badge">
-          <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
-          Active
-        </div>
+        <div class="reward-badge">CHERRY MEMBER</div>
         <div class="reward-title" id="reward-title">Welcome Reward</div>
         <div class="reward-desc" id="reward-desc">Sign in to unlock your rewards and start earning points at Cherry stores.</div>
         <div class="reward-redeemed-label" id="reward-redeemed-label" style="display:none;">Redeemed today</div>
@@ -800,6 +813,7 @@
         <input type="password" id="signin-pin" placeholder="••••" maxlength="6" inputmode="numeric">
       </div>
       <button class="btn-primary" onclick="handleSignIn()">Sign In</button>
+      <button class="btn-link" onclick="openForgotPinModal()">Forgot PIN?</button>
     </div>
 
     <div id="form-signup" style="display:none">
@@ -816,6 +830,34 @@
         <input type="password" id="signup-pin" placeholder="••••" maxlength="6" inputmode="numeric">
       </div>
       <button class="btn-primary" onclick="handleSignUp()">Create Account</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ FORGOT PIN MODAL ══════════════════════════ -->
+<div class="modal-overlay" id="forgot-pin-modal">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <button class="modal-close" onclick="closeForgotPinModal()">✕</button>
+    <div class="modal-title">Reset Your PIN</div>
+    <div class="modal-sub">Enter your email address to receive a PIN reset link</div>
+
+    <div id="form-forgot-pin">
+      <div class="field">
+        <label>Email Address</label>
+        <input type="email" id="forgot-pin-email" placeholder="you@example.com" autocomplete="email">
+      </div>
+      <button class="btn-primary" onclick="handleForgotPin()">Send Reset Link</button>
+      <button class="btn-link" onclick="closeForgotPinModal()">Back to Sign In</button>
+    </div>
+
+    <div id="forgot-pin-success" style="display:none;">
+      <div style="text-align: center; padding: 20px 0;">
+        <div style="font-size: 48px; margin-bottom: 16px;">✓</div>
+        <div style="font-size: 15px; color: var(--ink); margin-bottom: 8px; font-weight: 600;">Reset link sent!</div>
+        <div style="font-size: 13px; color: var(--muted); line-height: 1.6;">Check your email inbox (and spam folder) for a PIN reset link. Click the link to reset your PIN.</div>
+        <button class="btn-secondary" onclick="closeForgotPinModal(); switchTab('signin');" style="margin-top: 20px;">Back to Sign In</button>
+      </div>
     </div>
   </div>
 </div>
@@ -982,6 +1024,47 @@ async function handleSignUp() {
   showToast('Account created! Welcome to Cherry 🍒', 'success');
 }
 
+// ═══ FORGOT PIN ════════════════════════════════════
+function openForgotPinModal() {
+  document.getElementById('auth-modal').classList.remove('active');
+  document.getElementById('forgot-pin-modal').classList.add('active');
+  document.getElementById('form-forgot-pin').style.display = 'block';
+  document.getElementById('forgot-pin-success').style.display = 'none';
+  document.getElementById('forgot-pin-email').value = '';
+}
+
+function closeForgotPinModal() {
+  document.getElementById('forgot-pin-modal').classList.remove('active');
+  document.getElementById('form-forgot-pin').style.display = 'block';
+  document.getElementById('forgot-pin-success').style.display = 'none';
+}
+
+document.getElementById('forgot-pin-modal').addEventListener('click', function(e) {
+  if (e.target === this) closeForgotPinModal();
+});
+
+async function handleForgotPin() {
+  const email = document.getElementById('forgot-pin-email').value.trim().toLowerCase();
+  
+  if (!email) {
+    showToast('Please enter your email address', 'error');
+    return;
+  }
+
+  // Send PIN reset request via Worker
+  const { ok, data } = await workerPost('/auth/reset-pin', { email });
+
+  if (!ok) {
+    showToast(data.error || 'Failed to send reset link. Please try again.', 'error');
+    return;
+  }
+
+  // Show success message
+  document.getElementById('form-forgot-pin').style.display = 'none';
+  document.getElementById('forgot-pin-success').style.display = 'block';
+  showToast('PIN reset link sent to your email! 📧', 'success');
+}
+
 // ═══ UPDATE REWARD DESC / REDEEMED LABEL ══════════
 function updateRewardDesc(user) {
   const hasFund2 = typeof user.fund2 === 'number' && user.fund2 >= 0;
@@ -1098,319 +1181,93 @@ async function startScan() {
   await video.play().catch(() => {});
   container.style.display = 'block';
 
-  btn.textContent = '⏹ Stop Scanning';
+  const canvas = document.getElementById('qr-canvas');
+  const ctx = canvas.getContext('2d', { willReadFrequently: true });
+  canvas.width = 1280; canvas.height = 720;
+
+  btn.innerHTML = `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg> Stop Scanning`;
   btn.disabled = false;
   btn.onclick = stopScan;
 
-  if ('BarcodeDetector' in window) {
-    scanWithBarcodeDetector(video);
-  } else {
-    scanWithJsQR(video);
-  }
-}
-
-async function scanWithBarcodeDetector(video) {
-  const detector = new BarcodeDetector({ formats: ['qr_code'] });
-  async function tick() {
-    if (!qrStream) return;
+  async function scanFrame() {
     if (video.readyState === video.HAVE_ENOUGH_DATA) {
-      try {
-        const codes = await detector.detect(video);
-        if (codes.length > 0) { await onQRCodeScanned(codes[0].rawValue); return; }
-      } catch(e) {}
-    }
-    qrAnimFrame = requestAnimationFrame(tick);
-  }
-  qrAnimFrame = requestAnimationFrame(tick);
-}
-
-function scanWithJsQR(video) {
-  const canvas = document.getElementById('qr-canvas');
-  const ctx = canvas.getContext('2d');
-  function tick() {
-    if (!qrStream) return;
-    if (video.readyState === video.HAVE_ENOUGH_DATA) {
-      canvas.width  = video.videoWidth;
-      canvas.height = video.videoHeight;
       ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
       const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-      const code = jsQR(imageData.data, imageData.width, imageData.height, { inversionAttempts: 'dontInvert' });
-      if (code) { onQRCodeScanned(code.data); return; }
-    }
-    qrAnimFrame = requestAnimationFrame(tick);
-  }
-  qrAnimFrame = requestAnimationFrame(tick);
-}
+      const code = jsQR(imageData.data, imageData.width, imageData.height, { inversionAttempts: 2 });
+      if (code) {
+        stopScan();
+        const qrValue = code.data;
+        document.getElementById('scan-result').classList.add('show');
+        document.getElementById('scan-result-text').textContent = 'Processing...';
 
-function stopStreamTracks() {
-  if (qrAnimFrame) { cancelAnimationFrame(qrAnimFrame); qrAnimFrame = null; }
-  if (qrStream) { qrStream.getTracks().forEach(t => t.stop()); qrStream = null; }
+        if (!currentUser) {
+          showToast('Please sign in first', 'error');
+          return;
+        }
+
+        const { ok, data } = await workerPost('/scan/process', {
+          userid: currentUser.userid,
+          email: currentUser.email,
+          qrValue,
+        });
+
+        if (ok && data.success) {
+          document.getElementById('scan-result-icon').textContent = '✓';
+          document.getElementById('scan-result-text').textContent = 'Points earned!';
+          if (data.newFund1) currentUser.fund1 = data.newFund1;
+          document.getElementById('reward-pts').textContent = currentUser.fund1 ?? 0;
+          showToast('Great! Points added to your account 🍒', 'success');
+        } else {
+          document.getElementById('scan-result-icon').textContent = '✕';
+          document.getElementById('scan-result-text').textContent = 'Invalid code';
+          showToast(data.error || 'QR code not recognized', 'error');
+        }
+
+        setTimeout(() => {
+          document.getElementById('scan-result').classList.remove('show');
+          btn.innerHTML = SCAN_BTN_HTML;
+          btn.disabled = false;
+          btn.onclick = startScan;
+        }, 2500);
+        return;
+      }
+    }
+    qrAnimFrame = requestAnimationFrame(scanFrame);
+  }
+  scanFrame();
 }
 
 function stopScan() {
   stopStreamTracks();
   document.getElementById('qr-reader-container').style.display = 'none';
+  if (qrAnimFrame) cancelAnimationFrame(qrAnimFrame);
   const btn = document.getElementById('scan-btn');
   btn.innerHTML = SCAN_BTN_HTML;
   btn.disabled = false;
   btn.onclick = startScan;
 }
 
-function stopScanSilent() {
-  stopStreamTracks();
-  document.getElementById('qr-reader-container').style.display = 'none';
-  const btn = document.getElementById('scan-btn');
-  btn.innerHTML = SCAN_BTN_HTML;
-  btn.disabled = false;
-  btn.onclick = startScan;
-}
-
-async function onQRCodeScanned(decodedText) {
-  stopScanSilent();
-  if (!currentUser) {
-    showToast('Please sign in first', 'error');
-    document.getElementById('auth-modal').classList.add('active');
-    return;
-  }
-
-  const resultEl = document.getElementById('scan-result');
-  const iconEl   = document.getElementById('scan-result-icon');
-  const textEl   = document.getElementById('scan-result-text');
-
-  if (decodedText.includes('$')) {
-    await handleEarnReward(decodedText, resultEl, iconEl, textEl);
-  } else if (decodedText.includes('@')) {
-    await handleTransferReward(decodedText, resultEl, iconEl, textEl);
-  } else {
-    iconEl.textContent = '❌';
-    textEl.textContent = 'Invalid QR code format. Please try again.';
-    resultEl.classList.add('show');
+function stopStreamTracks() {
+  if (qrStream) {
+    qrStream.getTracks().forEach(t => t.stop());
+    qrStream = null;
   }
 }
 
-// ── Earn Reward ────────────────────────────────────────────────────────────
-async function handleEarnReward(scannedData, resultEl, iconEl, textEl) {
-  try {
-    const parts = scannedData.split('$');
-    if (parts.length !== 4) {
-      iconEl.textContent = '❌';
-      textEl.textContent = 'Invalid earn reward QR format.';
-      resultEl.classList.add('show');
-      return;
-    }
-
-    const [f_userid, provider_name, reward, cherry_code] = parts;
-    const rewardFloat      = parseFloat(reward);
-    const rewardNoDecimal  = reward.replace('.', '');
-    const idtoken          = cherry_code + rewardNoDecimal;
-
-    // Token verification uses Supabase anon key (public read via RLS)
-    const { data: tokenRecord, error } = await db
-      .from('cherry_token_db')
-      .select('*')
-      .eq('idtoken', idtoken)
-      .single();
-
-    if (error || !tokenRecord) {
-      iconEl.textContent = '❌';
-      textEl.textContent = 'Verification failed. QR code not recognised.';
-      resultEl.classList.add('show');
-      return;
-    }
-
-    window.pendingEarnData = { f_userid, provider_name, reward: rewardFloat, idtoken };
-
-    iconEl.textContent = '✅';
-    textEl.innerHTML   = `<strong>${provider_name}</strong><br>${rewardFloat.toFixed(2)} points`;
-
-    const oldBtn = document.getElementById('earn-confirm-btn');
-    if (oldBtn) oldBtn.remove();
-
-    const confirmBtn = document.createElement('button');
-    confirmBtn.id = 'earn-confirm-btn';
-    confirmBtn.textContent = 'Confirm & Earn';
-    confirmBtn.style.cssText = 'margin-top:12px;padding:12px 28px;background:#C0152A;color:#fff;border:none;border-radius:14px;font-size:15px;font-weight:700;cursor:pointer;font-family:DM Sans,sans-serif;';
-    confirmBtn.onclick = function() { this.remove(); confirmEarnRewardFromQR(); };
-    resultEl.appendChild(confirmBtn);
-    resultEl.classList.add('show');
-
-  } catch (err) {
-    iconEl.textContent = '❌';
-    textEl.innerHTML   = `Error processing reward<br><small>${err.message}</small>`;
-    resultEl.classList.add('show');
-  }
-}
-
-async function confirmEarnRewardFromQR() {
-  if (!window.pendingEarnData) return;
-
-  const { f_userid, provider_name, reward, idtoken } = window.pendingEarnData;
-  const resultEl = document.getElementById('scan-result');
-  const iconEl   = document.getElementById('scan-result-icon');
-  const textEl   = document.getElementById('scan-result-text');
-
-  try {
-    const transId         = 'TXN-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
-    const currentTimestamp = new Date().toISOString();
-
-    const { error: updateError } = await db
-      .from('cherry_token_db')
-      .update({ f_userid, r_userid: currentUser.userid, t_fund1: reward, time: currentTimestamp, trans_id: transId })
-      .eq('idtoken', idtoken);
-
-    if (updateError) throw updateError;
-
-    const newPoints = (currentUser.fund1 || 0) + reward;
-    const { error: pointsError } = await db
-      .from('cherry_db')
-      .update({ fund1: newPoints })
-      .eq('userid', currentUser.userid);
-
-    if (pointsError) throw pointsError;
-
-    currentUser.fund1 = newPoints;
-    document.getElementById('reward-pts').textContent = newPoints;
-    updateCouponVisibility();
-
-    iconEl.textContent = '🍒';
-    textEl.textContent = 'Reward claimed successfully!';
-    resultEl.classList.add('show');
-    showToast('Reward claimed successfully', 'success');
-    window.pendingEarnData = null;
-
-  } catch (err) {
-    iconEl.textContent = '❌';
-    textEl.textContent = 'Failed to claim reward.';
-    showToast('Error claiming reward', 'error');
-  }
-}
-
-// ── Transfer Reward ────────────────────────────────────────────────────────
-async function handleTransferReward(scannedData, resultEl, iconEl, textEl) {
-  try {
-    const parts = scannedData.split('@');
-    if (parts.length !== 2) {
-      iconEl.textContent = '❌';
-      textEl.textContent = 'Invalid transfer reward QR format.';
-      resultEl.classList.add('show');
-      return;
-    }
-
-    const [r_userid, receiver_name] = parts;
-
-    const { data: receiver, error: receiverError } = await db
-      .from('cherry_db')
-      .select('userid')
-      .eq('userid', r_userid)
-      .single();
-
-    if (receiverError || !receiver) {
-      iconEl.textContent = '❌';
-      textEl.textContent = 'Receiver not found.';
-      resultEl.classList.add('show');
-      return;
-    }
-
-    const { ok: pendingOk, data: pendingData } = await workerPost('/transfer/check-pending', { userid: currentUser.userid });
-    const hasPendingTransfer = pendingOk && pendingData && pendingData.hasPendingTransfer;
-    window.pendingTransferData = { r_userid, receiver_name, hasPendingTransfer };
-
-    if (hasPendingTransfer) {
-      iconEl.textContent = '⏳';
-      textEl.textContent = `${receiver_name}
-
-Previous transaction processing
-Try again after sometime`;
-    } else {
-      iconEl.textContent = '✅';
-      textEl.textContent = `Wish to transfer:
-2.50 or 5.00 or 10.00 points to 
-: ${receiver_name}`;
-    }
-    resultEl.classList.add('show');
-
-  } catch (err) {
-    iconEl.textContent = '❌';
-    textEl.textContent = 'Error processing transfer.';
-    resultEl.classList.add('show');
-  }
-}
-
-async function confirmTransferRewardFromQR(amount) {
-  if (!window.pendingTransferData) return;
-
-  const { r_userid, receiver_name } = window.pendingTransferData;
-  const resultEl = document.getElementById('scan-result');
-  const iconEl   = document.getElementById('scan-result-icon');
-  const textEl   = document.getElementById('scan-result-text');
-
-  try {
-    const { ok, data } = await workerPost('/transfer/confirm', {
-      f_userid: currentUser.userid,
-      r_userid,
-      amount,
-    });
-
-    if (!ok || !data.ok) {
-      iconEl.textContent = '❌';
-      textEl.textContent = data.error || 'Transfer verification failed.';
-      resultEl.classList.add('show');
-      return;
-    }
-
-    currentUser.fund1 = data.newFund1;
-    document.getElementById('reward-pts').textContent = data.newFund1;
-    updateCouponVisibility();
-
-    iconEl.textContent = '🍒';
-    textEl.textContent = `Transfer successful!
-
-${amount.toFixed(2)} points to ${receiver_name}`;
-    resultEl.classList.add('show');
-    showToast('Transfer successful', 'success');
-    window.pendingTransferData = null;
-
-  } catch (err) {
-    iconEl.textContent = '❌';
-    textEl.textContent = 'Failed to transfer reward.';
-    showToast('Error transferring reward', 'error');
-  }
-}
-
-function closeScanResult() {
-  if (window.pendingTransferData && !window.pendingTransferData.selected) {
-    const resultEl = document.getElementById('scan-result');
-    resultEl.innerHTML = `
-      <div style="text-align:center;background:white;padding:32px 24px;border-radius:20px;max-width:360px;">
-        <div style="font-size:14px;color:#7A6065;margin-bottom:24px;">Select amount to transfer to</div>
-        <div style="font-family:'Playfair Display',serif;font-size:22px;color:#C0152A;margin-bottom:8px;">${window.pendingTransferData.receiver_name}</div>
-        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:20px;">
-          <button onclick="confirmTransferRewardFromQR(2.50)" style="padding:12px;border:2px solid #EAD9DC;background:transparent;border-radius:12px;font-weight:600;cursor:pointer;">2.50</button>
-          <button onclick="confirmTransferRewardFromQR(5.00)" style="padding:12px;border:2px solid #EAD9DC;background:transparent;border-radius:12px;font-weight:600;cursor:pointer;">5.00</button>
-          <button onclick="confirmTransferRewardFromQR(10.00)" style="padding:12px;border:2px solid #EAD9DC;background:transparent;border-radius:12px;font-weight:600;cursor:pointer;">10.00</button>
-        </div>
-        <button onclick="document.getElementById('scan-result').classList.remove('show');window.pendingTransferData=null;" style="width:100%;padding:12px;background:#EAD9DC;border:none;border-radius:12px;font-weight:600;cursor:pointer;color:#1A0A0E;">Cancel Transfer</button>
-      </div>`;
-    return;
-  }
-  document.getElementById('scan-result').classList.remove('show');
-  if (!currentUser) document.getElementById('auth-modal').classList.add('active');
-}
-
-// ═══ MAP (MapLibre GL + OpenFreeMap) ══════════════
+// ═══ MAP INITIALIZATION ════════════════════════════
 function initMap(lat, lng) {
-  if (leafletMap) { leafletMap.remove(); leafletMap = null; }
   leafletMap = new maplibregl.Map({
     container: 'map',
-    style: 'https://tiles.openfreemap.org/styles/liberty',
+    style: 'https://tiles.openfreemap.org/styles/positron',
     center: [lng, lat],
-    zoom: 13,
-    attributionControl: true,
+    zoom: 11,
   });
-  leafletMap.addControl(new maplibregl.NavigationControl(), 'top-right');
 
   const userEl = document.createElement('div');
-  userEl.innerHTML = `<div style="position:relative;width:20px;height:20px;"><div style="position:absolute;inset:0;background:rgba(192,21,42,0.25);border-radius:50%;animation:map-pulse 1.8s ease-out infinite;"></div><div style="position:absolute;top:3px;left:3px;width:14px;height:14px;background:#C0152A;border:2.5px solid #fff;border-radius:50%;box-shadow:0 2px 8px rgba(192,21,42,0.6);"></div></div>`;
+  userEl.innerHTML = '<div style="width:32px;height:32px;background:#5BB8F5;border:3px solid #fff;border-radius:50%;display:flex;align-items:center;justify-content:center;box-shadow:0 3px 12px rgba(91,184,245,0.55);font-size:16px;cursor:pointer;">📍</div>';
+  userEl.style.width = '32px';
+  userEl.style.height = '32px';
+
   new maplibregl.Marker({ element: userEl })
     .setLngLat([lng, lat])
     .setPopup(new maplibregl.Popup({ offset: 14 }).setHTML('<b style="font-family:DM Sans,sans-serif">You are here</b>'))
