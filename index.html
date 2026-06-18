@@ -730,6 +730,14 @@
     Scan Reward Code
   </button>
 
+  <button class="scan-btn" id="btn-open-coupon" style="display:none; background: var(--cherry-light); margin-top: 10px;" onclick="openCouponPage()">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M3 9a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v1a1.5 1.5 0 0 0 0 3v1a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-1a1.5 1.5 0 0 0 0-3V9z"/>
+      <line x1="9" y1="7" x2="9" y2="17" stroke-dasharray="2 2"/>
+    </svg>
+    Coupon
+  </button>
+
   <!-- ── REWARD + QR CARD ───────────────────────── -->
   <div class="section-label">Your Rewards</div>
 
@@ -1005,6 +1013,22 @@ function loginUser(user) {
 
   document.getElementById('btn-open-refund').style.display =
     (user.data1 === 'sub') ? '' : 'none';
+
+  updateCouponVisibility();
+}
+
+// ═══ COUPON BUTTON VISIBILITY ══════════════════════
+function updateCouponVisibility() {
+  const btn = document.getElementById('btn-open-coupon');
+  if (!btn) return;
+  btn.style.display = (currentUser && (currentUser.fund1 || 0) > 2.5) ? '' : 'none';
+}
+
+// ═══ OPEN COUPON PAGE ══════════════════════════════
+function openCouponPage() {
+  if (!currentUser) { showToast('Please sign in first', 'error'); return; }
+  const params = new URLSearchParams({ userid: currentUser.userid, email: currentUser.email });
+  window.location.href = 'coupon.html?' + params.toString();
 }
 
 // ═══ LOGOUT ═══════════════════════════════════════
@@ -1014,6 +1038,7 @@ document.getElementById('btn-logout').addEventListener('click', () => {
   document.getElementById('user-bar').classList.remove('visible');
   document.getElementById('btn-open-auth').textContent = 'Sign in';
   document.getElementById('btn-open-refund').style.display = 'none';
+  document.getElementById('btn-open-coupon').style.display = 'none';
   document.getElementById('reward-pts').textContent    = '–';
   document.getElementById('reward-title').textContent  = 'Welcome Reward';
   document.getElementById('reward-desc').textContent   = 'Sign in to unlock your rewards and start earning.';
@@ -1245,6 +1270,7 @@ async function confirmEarnRewardFromQR() {
 
     currentUser.fund1 = newPoints;
     document.getElementById('reward-pts').textContent = newPoints;
+    updateCouponVisibility();
 
     iconEl.textContent = '🍒';
     textEl.textContent = 'Reward claimed successfully!';
@@ -1285,14 +1311,8 @@ async function handleTransferReward(scannedData, resultEl, iconEl, textEl) {
       return;
     }
 
-    const pendingIdtokens = ['999999900250', '999999900500', '999999901000'];
-    const { data: pendingTransfers } = await db
-      .from('cherry_token_db')
-      .select('idtoken')
-      .in('idtoken', pendingIdtokens)
-      .eq('f_userid', currentUser.userid);
-
-    const hasPendingTransfer = pendingTransfers && pendingTransfers.length > 0;
+    const { ok: pendingOk, data: pendingData } = await workerPost('/transfer/check-pending', { userid: currentUser.userid });
+    const hasPendingTransfer = pendingOk && pendingData && pendingData.hasPendingTransfer;
     window.pendingTransferData = { r_userid, receiver_name, hasPendingTransfer };
 
     if (hasPendingTransfer) {
@@ -1325,42 +1345,22 @@ async function confirmTransferRewardFromQR(amount) {
   const textEl   = document.getElementById('scan-result-text');
 
   try {
-    const idtokenMap = { 2.50: '999999900250', 5.00: '999999900500', 10.00: '999999901000' };
-    const idtoken    = idtokenMap[amount];
+    const { ok, data } = await workerPost('/transfer/confirm', {
+      f_userid: currentUser.userid,
+      r_userid,
+      amount,
+    });
 
-    const { data: tokenRecord, error } = await db
-      .from('cherry_token_db')
-      .select('*')
-      .eq('idtoken', idtoken)
-      .single();
-
-    if (error || !tokenRecord) {
+    if (!ok || !data.ok) {
       iconEl.textContent = '❌';
-      textEl.textContent = 'Transfer verification failed.';
+      textEl.textContent = data.error || 'Transfer verification failed.';
       resultEl.classList.add('show');
       return;
     }
 
-    const transId          = 'TXN-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
-    const currentTimestamp  = new Date().toISOString();
-
-    const { error: updateError } = await db
-      .from('cherry_token_db')
-      .update({ f_userid: currentUser.userid, r_userid, t_fund1: amount, time: currentTimestamp, trans_id: transId })
-      .eq('idtoken', idtoken);
-
-    if (updateError) throw updateError;
-
-    const newPoints = (currentUser.fund1 || 0) - amount;
-    const { error: pointsError } = await db
-      .from('cherry_db')
-      .update({ fund1: newPoints })
-      .eq('userid', currentUser.userid);
-
-    if (pointsError) throw pointsError;
-
-    currentUser.fund1 = newPoints;
-    document.getElementById('reward-pts').textContent = newPoints;
+    currentUser.fund1 = data.newFund1;
+    document.getElementById('reward-pts').textContent = data.newFund1;
+    updateCouponVisibility();
 
     iconEl.textContent = '🍒';
     textEl.textContent = `Transfer successful!
