@@ -46,7 +46,7 @@
     overflow-x: hidden;
   }
 
-  /* ─── HEADER ─────────────────────────────────── */
+  /* ─── HEADER ─────────────────────────────── */
   header {
     background: var(--card-bg);
     border-bottom: 1px solid var(--border);
@@ -118,7 +118,7 @@
   }
   .btn-auth:hover { background: var(--cherry); color: #fff; }
 
-  /* ─── MAIN LAYOUT ─────────────────────────────── */
+  /* ─── MAIN LAYOUT ─────────────────────────── */
   main {
     max-width: 480px;
     margin: 0 auto;
@@ -128,7 +128,7 @@
     gap: 20px;
   }
 
-  /* ─── SCANNER VIEWPORT ────────────────────────── */
+  /* ─── SCANNER VIEWPORT ────────────────────── */
   .scanner-section {
     border-radius: 20px;
     overflow: hidden;
@@ -248,7 +248,7 @@
   }
   #qr-canvas { display: none; }
 
-  /* ─── SCAN BUTTON ─────────────────────────────── */
+  /* ─── SCAN BUTTON ─────────────────────────── */
   .scan-btn {
     width: 100%;
     background: var(--cherry);
@@ -280,7 +280,7 @@
   .scan-btn:active { transform: translateY(0); }
   .scan-btn:disabled { opacity: 0.7; cursor: not-allowed; }
 
-  /* ─── REWARD CARD ─────────────────────────────── */
+  /* ─── REWARD CARD ─────────────────────────── */
   .reward-card {
     background: var(--card-bg);
     border-radius: 20px;
@@ -379,7 +379,7 @@
     font-weight: 600;
   }
 
-  /* ─── MAP SECTION ─────────────────────────────── */
+  /* ─── MAP SECTION ─────────────────────────── */
   .map-section {
     border-radius: 20px;
     overflow: hidden;
@@ -414,7 +414,7 @@
     width: 100%;
   }
 
-  /* ─── AUTH MODAL ──────────────────────────────── */
+  /* ─── AUTH MODAL ──────────────────────────── */
   .modal-overlay {
     display: none;
     position: fixed;
@@ -721,6 +721,11 @@
     💸 Request Refund
   </button>
 
+  <!-- Coupon button (shown when fund1 > 2.5) -->
+  <button class="scan-btn" id="btn-open-coupon" style="display:none; background: var(--sky);" onclick="openCouponPage()">
+    🎟️ Generate Coupon
+  </button>
+
   <!-- ── SCANNER ───────────────────────────────── -->
   <div class="section-label">Scan & Earn</div>
 
@@ -754,7 +759,7 @@
     Scan Reward Code
   </button>
 
-  <!-- ── REWARD CARD ───────────────────────────── -->
+  <!-- ── REWARD CARD ───────────────────────── -->
   <div class="section-label">Your Rewards</div>
 
   <div class="reward-card">
@@ -776,7 +781,7 @@
     </div>
   </div>
 
-  <!-- ── MAP ───────────────────────────────────── -->
+  <!-- ── MAP ───────────────────────────────── -->
   <div class="section-label">Nearby Stores</div>
 
   <div class="map-section">
@@ -790,7 +795,7 @@
 
 </main>
 
-<!-- ═══ AUTH MODAL ════════════════════════════════ -->
+<!-- ═══ AUTH MODAL ════════════════════════════ -->
 <div class="modal-overlay" id="auth-modal">
   <div class="modal">
     <div class="modal-handle"></div>
@@ -890,20 +895,29 @@
       </div>
       <button class="btn-primary" onclick="submitRefundClaim()">Submit Claim</button>
     </div>
+
+    <div id="refund-success" style="display:none;">
+      <div style="text-align: center; padding: 20px 0;">
+        <div style="font-size: 48px; margin-bottom: 16px;">✓</div>
+        <div style="font-size: 15px; color: var(--ink); margin-bottom: 8px; font-weight: 600;">Refund submitted!</div>
+        <div style="font-size: 13px; color: var(--muted); line-height: 1.6;">Your refund request has been received. We'll process it shortly and transfer funds to your account.</div>
+        <button class="btn-secondary" onclick="closeRefundModal();" style="margin-top: 20px;">Done</button>
+      </div>
+    </div>
   </div>
 </div>
 
-<!-- ═══ PIN VERIFICATION MODAL ════════════════════ -->
+<!-- PIN Verification Modal -->
 <div class="modal-overlay" id="pin-modal">
   <div class="modal">
     <div class="modal-handle"></div>
     <button class="modal-close" onclick="closePinModal()">✕</button>
-    <div class="modal-title">Verify Your Email</div>
+    <div class="modal-title">Verify PIN</div>
     <div class="modal-sub">Enter the 5-digit PIN sent to your email</div>
 
     <div class="field">
       <label>Verification PIN</label>
-      <input type="text" id="refund-pin" placeholder="•••••" maxlength="5" inputmode="numeric">
+      <input type="text" id="refund-pin" placeholder="00000" maxlength="5" inputmode="numeric">
     </div>
     <button class="btn-primary" onclick="verifyRefundPin()">Verify & Submit</button>
   </div>
@@ -1169,10 +1183,12 @@ function loginUser(user) {
 }
 
 // ═══ COUPON BUTTON VISIBILITY ══════════════════════
+// FIXED: Corrected the logic to show button when fund1 > 2.5
 function updateCouponVisibility() {
   const btn = document.getElementById('btn-open-coupon');
   if (!btn) return;
-  btn.style.display = (currentUser && (currentUser.fund1 || 0) > 2.5) ? '' : 'none';
+  // Show button if user is logged in AND fund1 is greater than 2.5
+  btn.style.display = (currentUser && ((currentUser.fund1 || 0) > 2.5)) ? '' : 'none';
 }
 
 // ═══ OPEN COUPON PAGE ══════════════════════════════
@@ -1381,7 +1397,17 @@ function selectTransferAmount(amt) {
   });
 }
 
-// ── Earn confirm ────────────────────────────────────
+// Modals
+function closeEarnModal() {
+  document.getElementById('earn-modal').classList.remove('active');
+  pendingEarn = null;
+}
+function closeTransferModal() {
+  document.getElementById('transfer-modal').classList.remove('active');
+  pendingTransfer = null;
+}
+
+// ─── Earn confirm ────────────────────────────────────
 async function confirmEarnReward() {
   if (!pendingEarn) return;
   const { f_userid, reward, idtoken } = pendingEarn;
@@ -1400,41 +1426,25 @@ async function confirmEarnReward() {
   }
 
   currentUser.fund1 = data.newFund1;
-  document.getElementById('reward-pts').textContent = currentUser.fund1 ?? 0;
+  document.getElementById('reward-pts').textContent = currentUser.fund1;
   updateCouponVisibility();
   closeEarnModal();
-  showToast('Reward claimed successfully 🍒', 'success');
+  showToast(`Earned ${reward.toFixed(2)} points! 🍒`, 'success');
 }
 
-function closeEarnModal() {
-  document.getElementById('earn-modal').classList.remove('active');
-  pendingEarn = null;
-}
-document.getElementById('earn-modal').addEventListener('click', function(e) {
-  if (e.target === this) closeEarnModal();
-});
-
-// ── Transfer confirm ────────────────────────────────
+// ─── Transfer confirm ────────────────────────────────
 async function confirmTransferReward() {
-  if (!pendingTransfer) return;
-  if (!selectedTransferAmount) {
-    showToast('Please select an amount to transfer', 'error');
+  if (!pendingTransfer || !selectedTransferAmount) {
+    showToast('Please select an amount', 'error');
     return;
   }
 
   const { r_userid, receiver_name } = pendingTransfer;
-  const amount = selectedTransferAmount;
 
-  if ((currentUser.fund1 || 0) < amount) {
-    showToast('Insufficient balance', 'error');
-    closeTransferModal();
-    return;
-  }
-
-  const { ok, data } = await workerPost('/qr/do-transfer', {
+  const { ok, data } = await workerPost('/transfer/confirm', {
     f_userid: currentUser.userid,
     r_userid,
-    amount,
+    amount: selectedTransferAmount,
   });
 
   if (!ok) {
@@ -1444,32 +1454,25 @@ async function confirmTransferReward() {
   }
 
   currentUser.fund1 = data.newFund1;
-  document.getElementById('reward-pts').textContent = currentUser.fund1 ?? 0;
+  document.getElementById('reward-pts').textContent = currentUser.fund1;
   updateCouponVisibility();
   closeTransferModal();
-  showToast('Transfer successful 🍒', 'success');
+  showToast(`Transferred ${selectedTransferAmount.toFixed(2)} points to ${receiver_name}! 🍒`, 'success');
 }
 
-function closeTransferModal() {
-  document.getElementById('transfer-modal').classList.remove('active');
-  pendingTransfer = null;
-  selectedTransferAmount = null;
-}
-document.getElementById('transfer-modal').addEventListener('click', function(e) {
-  if (e.target === this) closeTransferModal();
-});
-
-// ═══ MAP INITIALIZATION ════════════════════════════
+// ═══ MAP ═══════════════════════════════════════════
 function initMap(lat, lng) {
   leafletMap = new maplibregl.Map({
     container: 'map',
-    style: 'https://tiles.openfreemap.org/styles/positron',
+    style: 'https://tiles.openfreemap.org/styles/liberty',
     center: [lng, lat],
-    zoom: 11,
+    zoom: 12,
+    attributionControl: true,
   });
 
   const userEl = document.createElement('div');
-  userEl.innerHTML = '<div style="width:32px;height:32px;background:#5BB8F5;border:3px solid #fff;border-radius:50%;display:flex;align-items:center;justify-content:center;box-shadow:0 3px 12px rgba(91,184,245,0.55);font-size:16px;cursor:pointer;">📍</div>';
+  userEl.innerHTML = '📍';
+  userEl.style.fontSize = '28px';
   userEl.style.width = '32px';
   userEl.style.height = '32px';
 
@@ -1555,7 +1558,7 @@ async function restoreSession() {
   }, 5000);
 }
 
-// ═══ REFUND CLAIM FEATURE ═════════════════════════
+// ═══ REFUND CLAIM FEATURE =════════════════════════
 let pendingRefund = null;
 
 document.getElementById('refund-modal').addEventListener('click', function(e) {
