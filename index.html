@@ -912,6 +912,77 @@
 <!-- Toast -->
 <div class="toast" id="toast"></div>
 
+<!-- ═══ EARN REWARD MODAL ══════════════════════════ -->
+<div class="modal-overlay" id="earn-modal">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <button class="modal-close" onclick="closeEarnModal()">✕</button>
+    <div class="modal-title">🍒 Earn Reward</div>
+    <div class="modal-sub" id="earn-modal-sub">Claim your reward points</div>
+
+    <div style="background:var(--bg);border-radius:14px;padding:18px;margin-bottom:20px;text-align:center;">
+      <div style="font-size:13px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:0.8px;margin-bottom:6px;">Provider</div>
+      <div id="earn-provider-name" style="font-family:'Playfair Display',serif;font-size:20px;font-weight:700;color:var(--ink);margin-bottom:14px;">–</div>
+      <div style="font-size:13px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:0.8px;margin-bottom:6px;">Reward</div>
+      <div id="earn-reward-value" style="font-family:'Playfair Display',serif;font-size:36px;font-weight:700;color:var(--cherry);">–</div>
+      <div style="font-size:12px;color:var(--muted);margin-top:2px;">points</div>
+    </div>
+
+    <button class="btn-primary" onclick="confirmEarnReward()">Earn Reward</button>
+    <button class="btn-secondary" onclick="closeEarnModal()" style="margin-top:10px;">Cancel</button>
+  </div>
+</div>
+
+<!-- ═══ TRANSFER REWARD MODAL ═════════════════════ -->
+<div class="modal-overlay" id="transfer-modal">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <button class="modal-close" onclick="closeTransferModal()">✕</button>
+    <div class="modal-title">💸 Transfer Reward</div>
+    <div class="modal-sub">Send points to a Cherry member</div>
+
+    <div style="background:var(--bg);border-radius:14px;padding:18px;margin-bottom:20px;text-align:center;">
+      <div style="font-size:13px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:0.8px;margin-bottom:6px;">Recipient</div>
+      <div id="transfer-receiver-name" style="font-family:'Playfair Display',serif;font-size:20px;font-weight:700;color:var(--ink);margin-bottom:16px;">–</div>
+      <div style="font-size:13px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:0.8px;margin-bottom:10px;">Select Amount</div>
+      <div style="display:flex;gap:10px;justify-content:center;">
+        <button class="transfer-amt-btn" onclick="selectTransferAmount(2.50)" data-amt="2.50">2.50 pts</button>
+        <button class="transfer-amt-btn" onclick="selectTransferAmount(5.00)" data-amt="5.00">5.00 pts</button>
+        <button class="transfer-amt-btn" onclick="selectTransferAmount(10.00)" data-amt="10.00">10.00 pts</button>
+      </div>
+    </div>
+
+    <button class="btn-primary" onclick="confirmTransferReward()">Transfer</button>
+    <button class="btn-secondary" onclick="closeTransferModal()" style="margin-top:10px;">Cancel</button>
+  </div>
+</div>
+
+<style>
+.transfer-amt-btn {
+  flex: 1;
+  background: var(--card-bg);
+  border: 2px solid var(--border);
+  border-radius: 12px;
+  padding: 10px 6px;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--muted);
+  cursor: pointer;
+  transition: all 0.18s;
+}
+.transfer-amt-btn.selected {
+  background: var(--cherry);
+  border-color: var(--cherry);
+  color: #fff;
+  box-shadow: 0 4px 12px rgba(192,21,42,0.3);
+}
+.transfer-amt-btn:hover:not(.selected) {
+  border-color: var(--cherry);
+  color: var(--cherry);
+}
+</style>
+
 <!-- ═══════════════════════════════════════════════
 
 ════════════════════════════════════════════════ -->
@@ -1199,33 +1270,19 @@ async function startScan() {
 
         if (!currentUser) {
           showToast('Please sign in first', 'error');
-          return;
-        }
-
-        const { ok, data } = await workerPost('/scan/process', {
-          userid: currentUser.userid,
-          email: currentUser.email,
-          qrValue,
-        });
-
-        if (ok && data.success) {
-          document.getElementById('scan-result-icon').textContent = '✓';
-          document.getElementById('scan-result-text').textContent = 'Points earned!';
-          if (data.newFund1) currentUser.fund1 = data.newFund1;
-          document.getElementById('reward-pts').textContent = currentUser.fund1 ?? 0;
-          showToast('Great! Points added to your account 🍒', 'success');
-        } else {
-          document.getElementById('scan-result-icon').textContent = '✕';
-          document.getElementById('scan-result-text').textContent = 'Invalid code';
-          showToast(data.error || 'QR code not recognized', 'error');
-        }
-
-        setTimeout(() => {
           document.getElementById('scan-result').classList.remove('show');
           btn.innerHTML = SCAN_BTN_HTML;
           btn.disabled = false;
           btn.onclick = startScan;
-        }, 2500);
+          return;
+        }
+
+        await handleQRResult(qrValue);
+
+        document.getElementById('scan-result').classList.remove('show');
+        btn.innerHTML = SCAN_BTN_HTML;
+        btn.disabled = false;
+        btn.onclick = startScan;
         return;
       }
     }
@@ -1250,6 +1307,157 @@ function stopStreamTracks() {
     qrStream = null;
   }
 }
+
+// ═══ QR RESULT HANDLER ════════════════════════════
+// Pending state for earn/transfer confirmations
+let pendingEarn = null;
+let pendingTransfer = null;
+let selectedTransferAmount = null;
+
+async function handleQRResult(qrValue) {
+  // ── Possibility 1: Earn Reward  f_userid$provider_name$reward$cherry_code ──
+  const earnParts = qrValue.split('$');
+  if (earnParts.length === 4) {
+    const [f_userid, provider_name, rewardStr, cherry_code] = earnParts;
+    const reward = parseFloat(rewardStr);
+    if (!isNaN(reward) && f_userid && provider_name && cherry_code) {
+      // Build idtoken: string(cherry_code) + string(reward without decimal)
+      const rewardNoDec = String(Math.round(reward * 100));
+      const idtoken = parseInt(cherry_code + rewardNoDec, 10);
+
+      // Verify idtoken in cherry_token_db via worker
+      const { ok, data } = await workerPost('/qr/verify-earn', { idtoken });
+      if (!ok || !data.valid) {
+        showToast(data?.error || 'Invalid or already used reward code', 'error');
+        return;
+      }
+
+      // Show Earn panel
+      pendingEarn = { f_userid, provider_name, reward, idtoken };
+      document.getElementById('earn-provider-name').textContent = provider_name;
+      document.getElementById('earn-reward-value').textContent = reward.toFixed(2);
+      document.getElementById('earn-modal-sub').textContent = `You are about to earn ${reward.toFixed(2)} points from ${provider_name}`;
+      document.getElementById('earn-modal').classList.add('active');
+      return;
+    }
+  }
+
+  // ── Possibility 2: Transfer Reward  r_userid@receiver_name ──
+  const transferParts = qrValue.split('@');
+  if (transferParts.length === 2) {
+    const [r_userid, receiver_name] = transferParts;
+    if (r_userid && receiver_name) {
+      // Verify r_userid exists in cherry_db
+      const { ok, data } = await workerPost('/qr/verify-transfer', { r_userid });
+      if (!ok || !data.valid) {
+        showToast(data?.error || 'Recipient not found in Cherry network', 'error');
+        return;
+      }
+
+      // Prevent sending to yourself
+      if (r_userid === currentUser.userid) {
+        showToast('You cannot transfer points to yourself', 'error');
+        return;
+      }
+
+      // Show Transfer panel
+      pendingTransfer = { r_userid, receiver_name };
+      selectedTransferAmount = null;
+      document.getElementById('transfer-receiver-name').textContent = receiver_name;
+      // Reset amount buttons
+      document.querySelectorAll('.transfer-amt-btn').forEach(b => b.classList.remove('selected'));
+      document.getElementById('transfer-modal').classList.add('active');
+      return;
+    }
+  }
+
+  showToast('QR code format not recognised', 'error');
+}
+
+function selectTransferAmount(amt) {
+  selectedTransferAmount = amt;
+  document.querySelectorAll('.transfer-amt-btn').forEach(b => {
+    b.classList.toggle('selected', parseFloat(b.dataset.amt) === amt);
+  });
+}
+
+// ── Earn confirm ────────────────────────────────────
+async function confirmEarnReward() {
+  if (!pendingEarn) return;
+  const { f_userid, reward, idtoken } = pendingEarn;
+
+  const { ok, data } = await workerPost('/qr/claim-earn', {
+    idtoken,
+    f_userid,
+    r_userid: currentUser.userid,
+    reward,
+  });
+
+  if (!ok) {
+    showToast(data?.error || 'Failed to claim reward', 'error');
+    closeEarnModal();
+    return;
+  }
+
+  currentUser.fund1 = data.newFund1;
+  document.getElementById('reward-pts').textContent = currentUser.fund1 ?? 0;
+  updateCouponVisibility();
+  closeEarnModal();
+  showToast('Reward claimed successfully 🍒', 'success');
+}
+
+function closeEarnModal() {
+  document.getElementById('earn-modal').classList.remove('active');
+  pendingEarn = null;
+}
+document.getElementById('earn-modal').addEventListener('click', function(e) {
+  if (e.target === this) closeEarnModal();
+});
+
+// ── Transfer confirm ────────────────────────────────
+async function confirmTransferReward() {
+  if (!pendingTransfer) return;
+  if (!selectedTransferAmount) {
+    showToast('Please select an amount to transfer', 'error');
+    return;
+  }
+
+  const { r_userid, receiver_name } = pendingTransfer;
+  const amount = selectedTransferAmount;
+
+  if ((currentUser.fund1 || 0) < amount) {
+    showToast('Insufficient balance', 'error');
+    closeTransferModal();
+    return;
+  }
+
+  const { ok, data } = await workerPost('/qr/do-transfer', {
+    f_userid: currentUser.userid,
+    r_userid,
+    amount,
+  });
+
+  if (!ok) {
+    showToast(data?.error || 'Transfer failed', 'error');
+    closeTransferModal();
+    return;
+  }
+
+  currentUser.fund1 = data.newFund1;
+  document.getElementById('reward-pts').textContent = currentUser.fund1 ?? 0;
+  updateCouponVisibility();
+  closeTransferModal();
+  showToast('Transfer successful 🍒', 'success');
+}
+
+function closeTransferModal() {
+  document.getElementById('transfer-modal').classList.remove('active');
+  pendingTransfer = null;
+  selectedTransferAmount = null;
+}
+document.getElementById('transfer-modal').addEventListener('click', function(e) {
+  if (e.target === this) closeTransferModal();
+});
 
 // ═══ MAP INITIALIZATION ════════════════════════════
 function initMap(lat, lng) {
