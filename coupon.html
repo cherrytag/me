@@ -329,9 +329,11 @@
         Created on: <strong id="coupon-created"></strong>
       </div>
       <div class="btn-row">
-        <button class="btn-primary" onclick="downloadCouponQR()">⬇ Download Coupon</button>
+        <button class="btn-primary" id="save-btn" onclick="saveCoupon()">⬇ Save Coupon</button>
+        <button class="btn-secondary" onclick="shareOrCopy()">Share / Copy Link</button>
         <button class="btn-secondary" onclick="cancelCoupon()">Cancel Coupon</button>
       </div>
+
     </div>
   </div>
 </main>
@@ -496,19 +498,113 @@ function roundRect(ctx, x, y, w, h, r) {
 }
 
 // ═══ DOWNLOAD ═════════════════════════════════════
-function downloadCouponQR() {
+// ═══ PLATFORM DETECTION ═══════════════════════════════
+function isIOS() {
+  return /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+}
+function isAndroid() {
+  return /Android/.test(navigator.userAgent);
+}
+
+// ═══ SAVE COUPON (platform-aware) ═════════════════════
+async function saveCoupon() {
   const canvas = document.querySelector('#coupon-qr-canvas canvas');
-  if (!canvas) { showToast('QR not ready yet, try again in a moment', 'error'); return; }
+  if (!canvas) { showToast('QR not ready yet', 'error'); return; }
 
-  const link = document.createElement('a');
-  link.download = `cherry-coupon-${state.coupon.idCouponToken}.png`;
-  link.href = canvas.toDataURL('image/png');
-  document.body.appendChild(link);
-  link.click();
-  link.remove();
+  // Convert canvas to blob
+  canvas.toBlob(async (blob) => {
+    const file = new File([blob], `cherry-coupon-${state.coupon.idCouponToken}.png`, { type: 'image/png' });
 
-  showToast('Coupon downloaded', 'success');
-  setTimeout(() => { window.location.href = 'index.html'; }, 1000);
+    // ── Option A: Web Share API (iOS Safari 15+, Android Chrome) ──────────
+    // This triggers the native share sheet: user can choose Photos, Files, etc.
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      try {
+        await navigator.share({
+          files: [file],
+          title: 'Cherry Coupon',
+          text: `Cherry ${state.coupon.value.toFixed(2)} point coupon`,
+        });
+        showToast('Coupon shared/saved!', 'success');
+        setTimeout(() => { window.location.href = 'index.html'; }, 1200);
+        return;
+      } catch (e) {
+        if (e.name !== 'AbortError') {
+          // Fall through to next method if share fails (not user cancel)
+        } else {
+          return; // User cancelled — don't redirect
+        }
+      }
+    }
+
+    // ── Option B: iOS fallback — open image in new tab with instructions ───
+    if (isIOS()) {
+      const url = URL.createObjectURL(blob);
+      showSaveInstructions('ios', url);
+      return;
+    }
+
+    // ── Option C: Android fallback — standard download ─────────────────────
+    if (isAndroid()) {
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.download = `cherry-coupon-${state.coupon.idCouponToken}.png`;
+      link.href = url;
+      link.click();
+      URL.revokeObjectURL(url);
+      showToast('Coupon saved to Downloads', 'success');
+      setTimeout(() => { window.location.href = 'index.html'; }, 1200);
+      return;
+    }
+
+    // ── Option D: Desktop fallback ─────────────────────────────────────────
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.download = `cherry-coupon-${state.coupon.idCouponToken}.png`;
+    link.href = url;
+    link.click();
+    URL.revokeObjectURL(url);
+    showToast('Coupon downloaded', 'success');
+    setTimeout(() => { window.location.href = 'index.html'; }, 1200);
+  }, 'image/png');
+}
+
+// ═══ iOS INSTRUCTIONS OVERLAY ══════════════════════════
+function showSaveInstructions(platform, blobUrl) {
+  // Open image in new tab — on iOS, user can long-press → Save to Photos
+  const win = window.open(blobUrl, '_blank');
+  if (!win) {
+    // Popup blocked — show inline instructions instead
+    showToast('Long-press the QR image above → Save to Photos', '');
+  } else {
+    showToast('Tap & hold the image → Save to Photos', 'success');
+  }
+}
+
+// ═══ SHARE / COPY (secondary button) ══════════════════
+async function shareOrCopy() {
+  const canvas = document.querySelector('#coupon-qr-canvas canvas');
+  if (!canvas) { showToast('QR not ready yet', 'error'); return; }
+
+  canvas.toBlob(async (blob) => {
+    const file = new File([blob], `cherry-coupon-${state.coupon.idCouponToken}.png`, { type: 'image/png' });
+
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      try {
+        await navigator.share({ files: [file], title: 'Cherry Coupon' });
+        return;
+      } catch (e) { /* fall through */ }
+    }
+
+    // Fallback: copy image to clipboard
+    try {
+      await navigator.clipboard.write([
+        new ClipboardItem({ 'image/png': blob })
+      ]);
+      showToast('Coupon image copied to clipboard', 'success');
+    } catch {
+      showToast('Use the Save button to download', '');
+    }
+  }, 'image/png');
 }
 
 // ═══ CANCEL ═══════════════════════════════════════
