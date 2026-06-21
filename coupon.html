@@ -475,12 +475,6 @@ function generateCouponQR(qrText) {
     const qrCanvas = tempDiv.querySelector('canvas');
     if (!qrCanvas) { requestAnimationFrame(buildComposite); return; }
 
-
-  // Poll until the canvas element appears, then draw the logo
-  function overlayLogo() {
-    const canvas = container.querySelector('canvas');
-    if (!canvas) { requestAnimationFrame(overlayLogo); return; }
-
     // ── Draw logo overlay on the raw QR ──
 
     const ctx      = canvas.getContext('2d');
