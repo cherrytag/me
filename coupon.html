@@ -508,11 +508,54 @@ function isAndroid() {
 
 // ═══ SAVE COUPON (platform-aware) ═════════════════════
 async function saveCoupon() {
-  const canvas = document.querySelector('#coupon-qr-canvas canvas');
-  if (!canvas) { showToast('QR not ready yet', 'error'); return; }
+  const qrCanvas = document.querySelector('#coupon-qr-canvas canvas');
+  if (!qrCanvas) { showToast('QR not ready yet', 'error'); return; }
 
-  // Convert canvas to blob
-  canvas.toBlob(async (blob) => {
+  // ── Build a composite canvas ──────────────────────────────────────────────
+  const PAD   = 28;
+  const W     = qrCanvas.width + PAD * 2;          // match QR width + padding
+  const QR_Y  = 110;                                // top of QR block
+  const BOT   = QR_Y + qrCanvas.height + 20;       // bottom of QR block
+  const H     = BOT + 70;                           // extra space for text below
+
+  const out = document.createElement('canvas');
+  out.width  = W;
+  out.height = H;
+  const ctx = out.getContext('2d');
+
+  // Background
+  ctx.fillStyle = '#FFF8F5';
+  ctx.fillRect(0, 0, W, H);
+
+  // Red header bar
+  ctx.fillStyle = '#C0152A';
+  ctx.fillRect(0, 0, W, 80);
+
+  // Header text — "Cherry Coupon"
+  ctx.fillStyle = '#FFFFFF';
+  ctx.font      = 'bold 22px serif';
+  ctx.textAlign = 'center';
+  ctx.fillText('Cherry Coupon', W / 2, 34);
+
+  // Points value under header text
+  ctx.font      = 'bold 18px sans-serif';
+  ctx.fillText(`${state.coupon.value.toFixed(2)} points`, W / 2, 62);
+
+  // QR code image
+  ctx.drawImage(qrCanvas, PAD, QR_Y);
+
+  // "Valid for 24 hours"
+  ctx.fillStyle = '#1A0A0E';
+  ctx.font      = '500 14px sans-serif';
+  ctx.fillText('Valid for 24 hours', W / 2, BOT + 24);
+
+  // Created date
+  ctx.fillStyle = '#7A6065';
+  ctx.font      = '13px sans-serif';
+  ctx.fillText('Created: ' + new Date(state.coupon.createdAt).toLocaleString(), W / 2, BOT + 46);
+
+  // ── Export the composite ──────────────────────────────────────────────────
+  out.toBlob(async (blob) => {
     const file = new File([blob], `cherry-coupon-${state.coupon.idCouponToken}.png`, { type: 'image/png' });
 
     // ── Option A: Web Share API (iOS Safari 15+, Android Chrome) ──────────
@@ -582,10 +625,55 @@ function showSaveInstructions(platform, blobUrl) {
 
 // ═══ SHARE / COPY (secondary button) ══════════════════
 async function shareOrCopy() {
-  const canvas = document.querySelector('#coupon-qr-canvas canvas');
-  if (!canvas) { showToast('QR not ready yet', 'error'); return; }
+  const qrCanvas = document.querySelector('#coupon-qr-canvas canvas');
+  if (!qrCanvas) { showToast('QR not ready yet', 'error'); return; }
 
-  canvas.toBlob(async (blob) => {
+  // ── Build a composite canvas ──────────────────────────────────────────────
+  const PAD   = 28;
+  const W     = qrCanvas.width + PAD * 2;          // match QR width + padding
+  const QR_Y  = 110;                                // top of QR block
+  const BOT   = QR_Y + qrCanvas.height + 20;       // bottom of QR block
+  const H     = BOT + 70;                           // extra space for text below
+
+  const out = document.createElement('canvas');
+  out.width  = W;
+  out.height = H;
+  const ctx = out.getContext('2d');
+
+  // Background
+  ctx.fillStyle = '#FFF8F5';
+  ctx.fillRect(0, 0, W, H);
+
+  // Red header bar
+  ctx.fillStyle = '#C0152A';
+  ctx.fillRect(0, 0, W, 80);
+
+  // Header text — "Cherry Coupon"
+  ctx.fillStyle = '#FFFFFF';
+  ctx.font      = 'bold 22px serif';
+  ctx.textAlign = 'center';
+  ctx.fillText('Cherry Coupon', W / 2, 34);
+
+  // Points value under header text
+  ctx.font      = 'bold 18px sans-serif';
+  ctx.fillText(`${state.coupon.value.toFixed(2)} points`, W / 2, 62);
+
+  // QR code image
+  ctx.drawImage(qrCanvas, PAD, QR_Y);
+
+  // "Valid for 24 hours"
+  ctx.fillStyle = '#1A0A0E';
+  ctx.font      = '500 14px sans-serif';
+  ctx.fillText('Valid for 24 hours', W / 2, BOT + 24);
+
+  // Created date
+  ctx.fillStyle = '#7A6065';
+  ctx.font      = '13px sans-serif';
+  ctx.fillText('Created: ' + new Date(state.coupon.createdAt).toLocaleString(), W / 2, BOT + 46);
+
+  // ── Export the composite ──────────────────────────────────────────────────
+  
+  out.toBlob(async (blob) => {
     const file = new File([blob], `cherry-coupon-${state.coupon.idCouponToken}.png`, { type: 'image/png' });
 
     if (navigator.canShare && navigator.canShare({ files: [file] })) {
