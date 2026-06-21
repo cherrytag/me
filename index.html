@@ -815,7 +815,7 @@
       </div>
       <div class="field">
         <label>PIN</label>
-        <input type="password" id="signin-pin" placeholder="••••" maxlength="6" inputmode="numeric">
+        <input type="password" id="signin-pin" placeholder="••••" maxlength="6">
       </div>
       <button class="btn-primary" onclick="handleSignIn()">Sign In</button>
       <button class="btn-link" onclick="openForgotPinModal()">Forgot PIN?</button>
@@ -828,8 +828,8 @@
         <input type="email" id="signup-email" placeholder="you@example.com" autocomplete="email">
       </div>
       <div class="field">
-        <label>PIN (4–6 digits)</label>
-        <input type="password" id="signup-pin" placeholder="••••" maxlength="6" inputmode="numeric">
+        <label>PIN (6 chars)</label>
+        <input type="password" id="signup-pin" placeholder="••••" maxlength="6">
       </div>
       <button class="btn-primary" onclick="handleSignUp()">Create Account</button>
     </div>
@@ -1088,7 +1088,7 @@ async function handleSignUp() {
   const pin   = document.getElementById('signup-pin').value.trim();
 
   if (!email || !pin) { showToast('Email and PIN are required', 'error'); return; }
-  if (pin.length < 4)  { showToast('PIN must be at least 4 digits', 'error'); return; }
+  if (pin.length < 6)  { showToast('PIN must be at least 6 digits', 'error'); return; }
 
   const { ok, status, data } = await workerPost('/auth/signup', { email, pin });
 
