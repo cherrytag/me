@@ -467,24 +467,30 @@ function generateCouponQR(qrText) {
     correctLevel: QRCode.CorrectLevel.H, // high error correction so the center logo doesn't break scanning
   });
 
-  // Overlay the Cherry logo once the canvas has been drawn
-  requestAnimationFrame(() => {
+  // Poll until the canvas element appears, then draw the logo
+  function overlayLogo() {
     const canvas = container.querySelector('canvas');
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    const logoSize = canvas.width * 0.26;
-    const x = (canvas.width - logoSize) / 2;
-    const y = (canvas.height - logoSize) / 2;
-    const pad = 6;
+    if (!canvas) { requestAnimationFrame(overlayLogo); return; }
 
+    const ctx      = canvas.getContext('2d');
+    const logoSize = canvas.width * 0.26;
+    const x        = (canvas.width  - logoSize) / 2;
+    const y        = (canvas.height - logoSize) / 2;
+    const pad      = 6;
+
+    // White backing square
     ctx.fillStyle = '#FFFFFF';
     roundRect(ctx, x - pad, y - pad, logoSize + pad * 2, logoSize + pad * 2, 10);
     ctx.fill();
 
-    const logo = new Image();
-    logo.onload = () => ctx.drawImage(logo, x, y, logoSize, logoSize);
-    logo.src = CHERRY_LOGO_DATA_URI;
-  });
+    // Draw logo — wait for it to load before painting
+    const logo   = new Image();
+    logo.onload  = () => ctx.drawImage(logo, x, y, logoSize, logoSize);
+    logo.onerror = () => console.warn('Cherry logo failed to load');
+    logo.src     = CHERRY_LOGO_DATA_URI;
+  }
+
+  requestAnimationFrame(overlayLogo);
 }
 
 function roundRect(ctx, x, y, w, h, r) {
@@ -672,7 +678,7 @@ async function shareOrCopy() {
   ctx.fillText('Created: ' + new Date(state.coupon.createdAt).toLocaleString(), W / 2, BOT + 46);
 
   // ── Export the composite ──────────────────────────────────────────────────
-  
+
   out.toBlob(async (blob) => {
     const file = new File([blob], `cherry-coupon-${state.coupon.idCouponToken}.png`, { type: 'image/png' });
 
