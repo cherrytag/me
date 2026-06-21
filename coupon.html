@@ -458,7 +458,11 @@ function generateCouponQR(qrText) {
   const container = document.getElementById('coupon-qr-canvas');
   container.innerHTML = '';
 
-  new QRCode(container, {
+  // Render the raw QR into a temporary off-screen div first
+  const tempDiv = document.createElement('div');
+  document.body.appendChild(tempDiv);
+
+  new QRCode(tempDiv, {
     text: qrText,
     width: 220,
     height: 220,
@@ -467,10 +471,17 @@ function generateCouponQR(qrText) {
     correctLevel: QRCode.CorrectLevel.H, // high error correction so the center logo doesn't break scanning
   });
 
+  function buildComposite() {
+    const qrCanvas = tempDiv.querySelector('canvas');
+    if (!qrCanvas) { requestAnimationFrame(buildComposite); return; }
+
+
   // Poll until the canvas element appears, then draw the logo
   function overlayLogo() {
     const canvas = container.querySelector('canvas');
     if (!canvas) { requestAnimationFrame(overlayLogo); return; }
+
+    // ── Draw logo overlay on the raw QR ──
 
     const ctx      = canvas.getContext('2d');
     const logoSize = canvas.width * 0.26;
@@ -485,12 +496,65 @@ function generateCouponQR(qrText) {
 
     // Draw logo — wait for it to load before painting
     const logo   = new Image();
-    logo.onload  = () => ctx.drawImage(logo, x, y, logoSize, logoSize);
-    logo.onerror = () => console.warn('Cherry logo failed to load');
+    logo.onload  = () => {
+      ctx.drawImage(logo, x, y, logoSize, logoSize);
+      finishComposite(qrCanvas);   // proceed only after logo is painted
+    };
+
+    logo.onerror = () => finishComposite(qrCanvas);  // continue without logo
     logo.src     = CHERRY_LOGO_DATA_URI;
   }
 
-  requestAnimationFrame(overlayLogo);
+  function finishComposite(qrCanvas) {
+    // ── Build the same branded card that saveCoupon() produces ──
+    const PAD  = 28;
+    const W    = qrCanvas.width + PAD * 2;
+    const QR_Y = 110;
+    const BOT  = QR_Y + qrCanvas.height + 20;
+    const H    = BOT + 70;
+
+    const composite = document.createElement('canvas');
+    composite.width  = W;
+    composite.height = H;
+    const ctx = composite.getContext('2d');
+
+    // Background
+    ctx.fillStyle = '#FFF8F5';
+    ctx.fillRect(0, 0, W, H);
+
+    // Red header bar
+    ctx.fillStyle = '#C0152A';
+    ctx.fillRect(0, 0, W, 80);
+
+    // "Cherry Coupon" title
+    ctx.fillStyle  = '#FFFFFF';
+    ctx.font       = 'bold 22px serif';
+    ctx.textAlign  = 'center';
+    ctx.fillText('Cherry Coupon', W / 2, 34);
+
+    // Points value
+    ctx.font = 'bold 18px sans-serif';
+    ctx.fillText(`${state.coupon.value.toFixed(2)} points`, W / 2, 62);
+
+    // QR image
+    ctx.drawImage(qrCanvas, PAD, QR_Y);
+
+    // "Valid for 24 hours"
+    ctx.fillStyle = '#1A0A0E';
+    ctx.font      = '500 14px sans-serif';
+    ctx.fillText('Valid for 24 hours', W / 2, BOT + 24);
+
+    // Created date
+    ctx.fillStyle = '#7A6065';
+    ctx.font      = '13px sans-serif';
+    ctx.fillText('Created: ' + new Date(state.coupon.createdAt).toLocaleString(), W / 2, BOT + 46);
+
+    // ── Mount into the visible container ──
+    container.appendChild(composite);
+    document.body.removeChild(tempDiv);   // clean up temp node
+  }
+
+  requestAnimationFrame(buildComposite);
 }
 
 function roundRect(ctx, x, y, w, h, r) {
