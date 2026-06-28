@@ -1331,10 +1331,20 @@ let pendingTransfer = null;
 let selectedTransferAmount = null;
 
 async function handleQRResult(qrValue) {
-  // ── Possibility 1: Earn Reward  f_userid$provider_name$reward$cherry_code ──
-  const earnParts = qrValue.split('$');
+  // ── Possibility 1: Earn Reward ──
+  // Accepts both old plain format:  f_userid$provider_name$reward$cherry_code
+  // And new URL format:  https://cherrytag.org/?earn=f_userid$provider_name$reward$cherry_code
+  let earnRaw = qrValue;
+  try {
+    const u = new URL(qrValue);
+    const earnParam = u.searchParams.get('earn');
+    if (earnParam) earnRaw = earnParam;
+  } catch(e) { /* not a URL — use as-is */ }
+
+  const earnParts = earnRaw.split('$');
   if (earnParts.length === 4) {
     const [f_userid, provider_name, rewardStr, cherry_code] = earnParts;
+
     const reward = parseFloat(rewardStr);
     if (!isNaN(reward) && f_userid && provider_name && cherry_code) {
       // Build idtoken: string(cherry_code) + string(reward without decimal)
@@ -1709,6 +1719,9 @@ We will process your refund shortly.`,
 
 document.addEventListener('DOMContentLoaded', async () => {
   await restoreSession();
+  if (!currentUser) {
+    document.getElementById('auth-modal').classList.add('active');
+  }
   requestLocationAndInitMap();
 });
 </script>
