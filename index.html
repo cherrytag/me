@@ -1347,19 +1347,15 @@ async function handleQRResult(qrValue) {
 
     const reward = parseFloat(rewardStr);
     if (!isNaN(reward) && f_userid && provider_name && cherry_code) {
-      // Build idtoken: string(cherry_code) + string(reward without decimal)
-      const rewardNoDec = String(Math.round(reward * 100));
-      const idtoken = parseInt(cherry_code + rewardNoDec, 10);
-
-      // Verify idtoken in cherry_token_db via worker
-      const { ok, data } = await workerPost('/qr/verify-earn', { idtoken });
+      // idtoken is derived and verified server-side from cherry_code + reward
+      const { ok, data } = await workerPost('/qr/verify-earn', { cherry_code, reward });
       if (!ok || !data.valid) {
         showToast(data?.error || 'Invalid or already used reward code', 'error');
         return;
       }
 
       // Show Earn panel
-      pendingEarn = { f_userid, provider_name, reward, idtoken };
+      pendingEarn = { f_userid, provider_name, reward, cherry_code };
       document.getElementById('earn-provider-name').textContent = provider_name;
       document.getElementById('earn-reward-value').textContent = reward.toFixed(2);
       document.getElementById('earn-modal-sub').textContent = `You are about to earn ${reward.toFixed(2)} points from ${provider_name}`;
@@ -1420,10 +1416,10 @@ function closeTransferModal() {
 // ─── Earn confirm ────────────────────────────────────
 async function confirmEarnReward() {
   if (!pendingEarn) return;
-  const { f_userid, reward, idtoken } = pendingEarn;
+  const { f_userid, reward, cherry_code } = pendingEarn;
 
   const { ok, data } = await workerPost('/qr/claim-earn', {
-    idtoken,
+    cherry_code,
     f_userid,
     r_userid: currentUser.userid,
     reward,
