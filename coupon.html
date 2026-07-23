@@ -277,7 +277,7 @@
   <a class="logo" href="index.html">
     <svg width="30" height="30" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
       <path d="M18 10 Q22 4 26 6" stroke="#C0152A" stroke-width="1.8" stroke-linecap="round" fill="none"/>
-      <circle cx="12" cy="22" r="7" fill="#C0152A" opacity="0.85"/>
+      <circle cx="12" cy="22" r="7" fill="#F58B27" opacity="0.85"/>
       <circle cx="22" cy="22" r="7" fill="#C0152A"/>
       <circle cx="12" cy="22" r="7" fill="none" stroke="#fff" stroke-width="0.8" opacity="0.3"/>
       <circle cx="22" cy="22" r="7" fill="none" stroke="#fff" stroke-width="0.8" opacity="0.3"/>
@@ -406,7 +406,7 @@ async function workerPost(endpoint, body) {
 })();
 
 function renderBalance() {
-  document.getElementById('balance-pill').textContent = `🍒 ${state.balance.toFixed(2)} points available`;
+  document.getElementById('balance-pill').textContent = ` ${state.balance.toFixed(2)} points available`;
   document.querySelectorAll('.value-btn').forEach(btn => {
     const v = parseFloat(btn.dataset.value);
     btn.disabled = state.balance < v;
