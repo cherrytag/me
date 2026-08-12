@@ -716,6 +716,12 @@
     💸 Request Refund
   </button>
 
+
+  <!-- Business listing button () -->
+  <button class="scan-btn" id="btn-open-business" style="display:none; background: var(--sky);" onclick="openBusinessPage()">
+    🏪 Manage Business Listing
+  </button>
+
   <!-- ── SCANNER ───────────────────────────────── -->
   <div class="section-label">Scan & Earn</div>
 
@@ -1171,11 +1177,24 @@ function loginUser(user) {
   generateMemberQR(qrValue);
   document.getElementById('qr-label').textContent = emailName;
 
-  document.getElementById('btn-open-refund').style.display =
-    (user.data1 === 'sub') ? '' : 'none';
+  document.getElementById('btn-open-refund').style.display = 'none';
 
   updateCouponVisibility();
+  updateBusinessButtonVisibility();
 }
+
+function updateBusinessButtonVisibility() {
+  const btn = document.getElementById('btn-open-business');
+  if (!btn) return;
+  btn.style.display = (currentUser && currentUser.data1 === 'client') ? '' : 'none';
+}
+
+function openBusinessPage() {
+  if (!currentUser) { showToast('Please sign in first', 'error'); return; }
+  const params = new URLSearchParams({ userid: currentUser.userid, email: currentUser.email });
+  window.location.href = 'business-listing.html?' + params.toString();
+}
+
 
 // ═══ COUPON BUTTON VISIBILITY ══════════════════════
 // FIXED: Corrected the logic to show button when fund1 > 2.5
@@ -1201,6 +1220,7 @@ document.getElementById('btn-logout').addEventListener('click', () => {
   document.getElementById('btn-open-auth').textContent = 'Sign in';
   document.getElementById('btn-open-refund').style.display = 'none';
   document.getElementById('btn-open-coupon').style.display = 'none';
+  document.getElementById('btn-open-business').style.display = 'none';
   document.getElementById('reward-pts').textContent    = '–';
   document.getElementById('reward-title').textContent  = 'Welcome Reward';
   document.getElementById('reward-desc').textContent   = 'Sign in to unlock your rewards and start earning.';
@@ -1484,9 +1504,16 @@ function initMap(lat, lng) {
 
   leafletMap.on('load', () => loadStoreMarkers(lat, lng));
 }
+function escapeHtml(str) {
+  if (!str) return '';
+  return String(str).replace(/[&<>"']/g, c => (
+    { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]
+  ));
+}
+
 
 async function loadStoreMarkers(userLat, userLng) {
-  const { data: stores, error } = await db.from('stores').select('*');
+  const { data: stores, error } = await db.from('stores').select('*').eq('status', 'approved');
   if (error || !stores) { showToast('Could not load store locations', 'error'); return; }
 
   const R = 6371;
@@ -1504,16 +1531,40 @@ async function loadStoreMarkers(userLat, userLng) {
   withinRadius.forEach(store => {
     const el = document.createElement('div');
     el.title = store.name;
-    el.innerHTML = `<div style="width:32px;height:32px;background:#C0152A;border:2.5px solid #fff;border-radius:50%;display:flex;align-items:center;justify-content:center;box-shadow:0 3px 12px rgba(192,21,42,0.55);font-size:16px;cursor:pointer;transition:transform 0.15s;">🍒</div>`;
-    el.addEventListener('mouseenter', () => el.firstElementChild.style.transform = 'scale(1.2)');
-    el.addEventListener('mouseleave', () => el.firstElementChild.style.transform = 'scale(1)');
+    el.innerHTML = `<div style="width:32px;height:32px;background:#C0152A;border:2.5px solid #fff;border-radius:50%;display:flex;align-items:center;justify-content:center;box-shadow:0 3px 12px rgba(192,21,42,0.55);font-size:16px;cursor:pointer;transition:transform 0.15s;"></div>`;
+    //el.addEventListener('mouseenter', () => el.firstElementChild.style.transform = 'scale(1.2)');
+    //el.addEventListener('mouseleave', () => el.firstElementChild.style.transform = 'scale(1)');
 
-    const popup = new maplibregl.Popup({ offset: 18, closeButton: false })
-      .setHTML(`<div style="font-family:'DM Sans',sans-serif;min-width:160px;padding:2px 0;"><div style="font-weight:700;font-size:14px;margin-bottom:3px;">${store.name}</div><div style="font-size:12px;color:#7A6065;">${store.address || ''}</div><div style="margin-top:6px;font-size:11px;font-weight:600;color:${store.open ? '#22C55E' : '#C0152A'};">${store.open ? '● Open now' : '● Closed'}</div></div>`);
+    //const popup = new maplibregl.Popup({ offset: 18, closeButton: false })
+    //  .setHTML(`<div style="font-family:'DM Sans',sans-serif;min-width:160px;padding:2px 0;"><div style="font-weight:700;font-size:14px;margin-bottom:3px;">${store.name}</div><div style="font-size:12px;color:#7A6065;">${store.address || ''}</div><div style="margin-top:6px;font-size:11px;font-weight:600;color:${store.open ? '#22C55E' : '#C0152A'};">${store.open ? '● Open now' : '● Closed'}</div></div>`);
+    const hasAd = !!(store.ad_enabled && (store.ad_message || store.image_url));
+
+    const popup = new maplibregl.Popup({ offset: 18, closeButton: false, maxWidth: '220px' })
+      .setHTML(`
+        <div style="...">
+          ${store.image_url ? `<img src="${escapeHtml(store.image_url)}" ...>` : ''}
+          <div>${escapeHtml(store.name)}</div>
+          <div>${escapeHtml(store.address || '')}</div>
+          ${hasAd && store.ad_message ? `<div>"${escapeHtml(store.ad_message)}"</div>` : ''}
+          <div>${store.open ? '● Open now' : '● Closed'}</div>
+        </div>`);
+
+    el.addEventListener('mouseenter', () => {
+      el.firstElementChild.style.transform = 'scale(1.2)';
+      popup.setLngLat([store.lng, store.lat]).addTo(leafletMap);
+    });
+    el.addEventListener('mouseleave', () => {
+      el.firstElementChild.style.transform = 'scale(1)';
+      popup.remove();
+    });
+    el.addEventListener('click', () => {
+      if (popup.isOpen()) popup.remove();
+      else popup.setLngLat([store.lng, store.lat]).addTo(leafletMap);
+    });
 
     new maplibregl.Marker({ element: el })
       .setLngLat([store.lng, store.lat])
-      .setPopup(popup)
+      //.setPopup(popup)
       .addTo(leafletMap);
   });
 }
