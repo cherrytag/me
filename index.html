@@ -1482,6 +1482,10 @@ async function confirmTransferReward() {
 }
 
 // ═══ MAP ═══════════════════════════════════════════
+let allStoresCache = null;   // fetched once, reused on every pan
+let storeMarkers = [];       // currently-rendered marker instances, so we can clear them
+let currentPopups = [];      // currently-rendered popups, read by the single map click listener below
+
 function initMap(lat, lng) {
   leafletMap = new maplibregl.Map({
     container: 'map',
@@ -1502,7 +1506,22 @@ function initMap(lat, lng) {
     .setPopup(new maplibregl.Popup({ offset: 14 }).setHTML('<b style="font-family:DM Sans,sans-serif">You are here</b>'))
     .addTo(leafletMap);
 
-  leafletMap.on('load', () => loadStoreMarkers(lat, lng));
+  leafletMap.on('load', async () => {
+    await loadStoreMarkers();                 // fetch + cache once
+    renderStoreMarkers(lat, lng);              // initial render at user's location
+
+    let panTimer;
+    leafletMap.on('moveend', () => {
+      clearTimeout(panTimer);
+      panTimer = setTimeout(() => {
+        const c = leafletMap.getCenter();
+        renderStoreMarkers(c.lat, c.lng);      // re-render around new map center
+      }, 150); // small debounce so momentum-panning doesn't refire dozens of times
+    });
+    // ADD THIS — registered once, not per-pan:
+    leafletMap.on('click', () => {
+      currentPopups.forEach(p => { if (p.isOpen()) p.remove(); });
+  });
 }
 function escapeHtml(str) {
   if (!str) return '';
@@ -1511,17 +1530,25 @@ function escapeHtml(str) {
   ));
 }
 
-
-async function loadStoreMarkers(userLat, userLng) {
+async function loadStoreMarkers() {
   const { data: stores, error } = await db.from('stores').select('*').eq('status', 'approved');
   if (error || !stores) { showToast('Could not load store locations', 'error'); return; }
+  allStoresCache = stores;   // cache once — no more DB calls on every pan
+}
+
+function renderStoreMarkers(centerLat, centerLng) {
+  if (!allStoresCache) return;
+
+  // clear markers from the previous render
+  storeMarkers.forEach(m => m.remove());
+  storeMarkers = [];
 
   const R = 6371;
-  const withinRadius = stores.filter(store => {
-    const dLat = (store.lat - userLat) * Math.PI / 180;
-    const dLng = (store.lng - userLng) * Math.PI / 180;
+  const withinRadius = allStoresCache.filter(store => {
+    const dLat = (store.lat - centerLat) * Math.PI / 180;
+    const dLng = (store.lng - centerLng) * Math.PI / 180;
     const a = Math.sin(dLat/2)**2 +
-              Math.cos(userLat * Math.PI/180) * Math.cos(store.lat * Math.PI/180) * Math.sin(dLng/2)**2;
+              Math.cos(centerLat * Math.PI/180) * Math.cos(store.lat * Math.PI/180) * Math.sin(dLng/2)**2;
     return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)) <= 8;
   });
 
@@ -1572,15 +1599,13 @@ async function loadStoreMarkers(userLat, userLng) {
       else popup.setLngLat([store.lng, store.lat]).addTo(leafletMap);
     });
 
-    new maplibregl.Marker({ element: el })
+    const marker = new maplibregl.Marker({ element: el })
       .setLngLat([store.lng, store.lat])
-      //.setPopup(popup)
       .addTo(leafletMap);
-  });
+    storeMarkers.push(marker);   // track it so it can be removed on the next pan
+    });
 
-    leafletMap.on('click', () => {
-    allPopups.forEach(p => { if (p.isOpen()) p.remove(); });
-  });
+    currentPopups = allPopups; // read by the single map click listener registered in initMap
 
 }
 
