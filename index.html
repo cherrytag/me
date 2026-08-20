@@ -1543,6 +1543,8 @@ function renderStoreMarkers(centerLat, centerLng) {
   // clear markers from the previous render
   storeMarkers.forEach(m => m.remove());
   storeMarkers = [];
+  // close popup
+  currentPopups.forEach(p => { if (p.isOpen()) p.remove(); });
 
   const R = 6371;
   const withinRadius = allStoresCache.filter(store => {
