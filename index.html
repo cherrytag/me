@@ -1518,9 +1518,10 @@ function initMap(lat, lng) {
         renderStoreMarkers(c.lat, c.lng);      // re-render around new map center
       }, 150); // small debounce so momentum-panning doesn't refire dozens of times
     });
-    // ADD THIS — registered once, not per-pan:
+    // registered once, not per-pan:
     leafletMap.on('click', () => {
       currentPopups.forEach(p => { if (p.isOpen()) p.remove(); });
+  });
   });
 }
 function escapeHtml(str) {
