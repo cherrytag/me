@@ -66,9 +66,9 @@
 
 <main>
   <div class="page-title">Privacy Policy</div>
-  <div class="updated">Last updated: <span class="placeholder">[DD Month YYYY]</span> · Applies to the Cherrytag app, cherrytag.org and the Cherrytag rewards network</div>
+  <div class="updated">Last updated: <span class="placeholder" data-legal="updatedPrivacy">[DD MM YYYY]</span> · Applies to the Cherrytag app, cherrytag.org and the Cherrytag rewards network</div>
 
-  <div class="note">This policy is written for the Cherrytag loyalty platform and is designed to comply with the New Zealand <strong>Privacy Act 2020</strong>. Text in <span class="placeholder">pink</span> marks details only you can fill in (legal entity name, NZBN, contact details) before this goes live. It's a good idea to have a lawyer give it a final check.</div>
+  //<div class="note">This policy is written for the Cherrytag loyalty platform and is designed to comply with the New Zealand <strong>Privacy Act 2020</strong>. Text in <span class="placeholder">pink</span> marks details only you can fill in (legal entity name, NZBN, contact details) before this goes live. It's a good idea to have a lawyer give it a final check.</div>
 
   <nav class="toc">
     <h2>Contents</h2>
@@ -94,8 +94,8 @@
 
   <section id="who-we-are">
     <h2>1. Who we are</h2>
-    <p><span class="placeholder">[Legal entity name, e.g. Cherrytag Limited]</span> (<strong>"Cherrytag", "we", "us"</strong>) operates the Cherrytag loyalty rewards platform (<strong>"Cherrytag"</strong> or the <strong>"App"</strong>), a spend-based loyalty programme for cafés and restaurants in the Auckland region, available at cherrytag.org and in-store as paper coupons.</p>
-    <p>NZBN: <span class="placeholder">[NZBN]</span> · Registered address: <span class="placeholder">[registered address]</span></p>
+    <p><span class="placeholder" data-legal="legalEntityName">[Legal entity name, e.g. Cherrytag Limited]</span> (<strong>"Cherrytag", "we", "us"</strong>) operates the Cherrytag loyalty rewards platform (<strong>"Cherrytag"</strong> or the <strong>"App"</strong>), a spend-based loyalty programme for cafés and restaurants in the Auckland region, available at cherrytag.org and in-store as paper coupons.</p>
+    <p>NZBN: <span class="placeholder" data-legal="nzbn">[NZBN]</span> · Registered address: <span class="placeholder" data-legal="registeredAddress">[registered address]</span></p>
   </section>
 
   <section id="scope">
@@ -213,8 +213,8 @@
   <section id="contact">
     <h2>14. Contact us</h2>
     <p>For any privacy question, access request or complaint, contact us at:</p>
-    <p>Email: <span class="placeholder">[privacy@cherrytag.org]</span><br>
-    Post: <span class="placeholder">[registered address]</span></p>
+    <p>Email: <span class="placeholder" data-legal="privacyEmail">[privacy@cherrytag.org]</span><br>
+    Post: <span class="placeholder" data-legal="registeredAddress">[registered address]</span></p>
   </section>
 
   </div>
@@ -224,5 +224,22 @@
   Cherrytag · <a href="privacy-policy.html">Privacy Policy</a> · <a href="terms-rewards.html">Rewards Terms</a> · <a href="terms-business.html">Business Terms</a>
 </footer>
 
+
+<script>
+(function () {
+  fetch('https://api.cherrytag.org/api/legal/config')
+    .then(function (r) { return r.ok ? r.json() : Promise.reject(r.status); })
+    .then(function (cfg) {
+      document.querySelectorAll('[data-legal]').forEach(function (el) {
+        var key = el.getAttribute('data-legal');
+        if (cfg[key]) {
+          el.textContent = cfg[key];
+          el.classList.remove('placeholder');
+        }
+      });
+    })
+    .catch(function (e) { console.warn('Legal config fetch failed, showing placeholders:', e); });
+})();
+</script>
 </body>
 </html>

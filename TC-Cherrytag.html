@@ -69,7 +69,7 @@
 
 <main>
   <div class="page-title">Business Subscriber Terms &amp; Conditions</div>
-  <div class="updated">Last updated: <span class="placeholder">[DD Month YYYY]</span> · For café, restaurant and other business owners subscribing to the Cherrytag network</div>
+  <div class="updated">Last updated: <span class="placeholder" data-legal="updatedTcBusiness">[DD Month YYYY]</span> · For café, restaurant and other business owners subscribing to the Cherrytag network</div>
 
   <div class="note">This agreement is between Cherrytag and you, the business owner or authorised representative ("Subscriber", "you"). If you're a shopper earning or redeeming rewards, see our separate <a href="terms-rewards.html">Rewards Terms</a> instead.</div>
 
@@ -206,7 +206,7 @@
 
   <section id="contact-b">
     <h2>17. Contact us</h2>
-    <p>Questions about your subscription, billing, or these terms? Email us at <span class="placeholder">[partners@cherrytag.org]</span>.</p>
+    <p>Questions about your subscription, billing, or these terms? Email us at <span class="placeholder" data-legal="partnersEmail">[partners@cherrytag.org]</span>.</p>
   </section>
 
   </div>
@@ -216,5 +216,22 @@
   Cherrytag · <a href="privacy-policy.html">Privacy Policy</a> · <a href="terms-rewards.html">Rewards Terms</a> · <a href="terms-business.html">Business Terms</a>
 </footer>
 
+
+<script>
+(function () {
+  fetch('https://api.cherrytag.org/api/legal/config')
+    .then(function (r) { return r.ok ? r.json() : Promise.reject(r.status); })
+    .then(function (cfg) {
+      document.querySelectorAll('[data-legal]').forEach(function (el) {
+        var key = el.getAttribute('data-legal');
+        if (cfg[key]) {
+          el.textContent = cfg[key];
+          el.classList.remove('placeholder');
+        }
+      });
+    })
+    .catch(function (e) { console.warn('Legal config fetch failed, showing placeholders:', e); });
+})();
+</script>
 </body>
 </html>
