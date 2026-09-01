@@ -301,15 +301,15 @@
   <div class="card" id="select-panel">
     <div class="section-label" style="margin-bottom:14px;">Choose a coupon value</div>
     <div class="value-grid" id="value-grid">
+      <button class="value-btn" data-value="1.5" disabled onclick="selectValue(1.5)">
+        <span class="amount">1.5</span><span class="label">points</span>
+      </button>
       <button class="value-btn" data-value="2.5" disabled onclick="selectValue(2.5)">
         <span class="amount">2.5</span><span class="label">points</span>
       </button>
-      <button class="value-btn" data-value="5" disabled onclick="selectValue(5)">
-        <span class="amount">5.0</span><span class="label">points</span>
-      </button>
-      <button class="value-btn" data-value="10" disabled onclick="selectValue(10)">
-        <span class="amount">10.0</span><span class="label">points</span>
-      </button>
+      //<button class="value-btn" data-value="10" disabled onclick="selectValue(10)">
+      //  <span class="amount">10.0</span><span class="label">points</span>
+      //</button>
     </div>
   </div>
 
@@ -322,7 +322,7 @@
   <!-- ── STEP 2: QR coupon ──────────────────────────── -->
   <div class="card" id="coupon-panel" hidden>
     <div class="qr-wrap">
-      <div class="coupon-value-tag" id="coupon-value-tag">2.5 points</div>
+      <div class="coupon-value-tag" id="coupon-value-tag">1.5 points</div>
       <div id="coupon-qr-canvas"></div>
       <div class="coupon-meta">
         Valid for 24 hr.<br>

@@ -1206,12 +1206,12 @@ function openBusinessPage() {
 
 
 // ═══ COUPON BUTTON VISIBILITY ══════════════════════
-// FIXED: Corrected the logic to show button when fund1 > 2.5
+// FIXED: Corrected the logic to show button when fund1 > 2.0
 function updateCouponVisibility() {
   const btn = document.getElementById('btn-open-coupon');
   if (!btn) return;
-  // Show button if user is logged in AND fund1 is greater than 2.5
-  btn.style.display = (currentUser && ((currentUser.fund1 || 0) > 2.5)) ? '' : 'none';
+  // Show button if user is logged in AND fund1 is greater than 2.0
+  btn.style.display = (currentUser && ((currentUser.fund1 || 0) > 2.0)) ? '' : 'none';
 }
 
 // ═══ OPEN COUPON PAGE ══════════════════════════════
@@ -1459,7 +1459,7 @@ async function confirmEarnReward() {
   document.getElementById('reward-pts').textContent = currentUser.fund1;
   updateCouponVisibility();
   closeEarnModal();
-  showToast(`Earned ${reward.toFixed(2)} points! 🍒`, 'success');
+  showToast(`Earned ${reward.toFixed(2)} points!`, 'success');
 }
 
 // ─── Transfer confirm ────────────────────────────────
@@ -1487,7 +1487,7 @@ async function confirmTransferReward() {
   document.getElementById('reward-pts').textContent = currentUser.fund1;
   updateCouponVisibility();
   closeTransferModal();
-  showToast(`Transferred ${selectedTransferAmount.toFixed(2)} points to ${receiver_name}! 🍒`, 'success');
+  showToast(`Transferred ${selectedTransferAmount.toFixed(2)} points to ${receiver_name}!`, 'success');
 }
 
 // ═══ MAP ═══════════════════════════════════════════
