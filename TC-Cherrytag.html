@@ -218,8 +218,9 @@
 
 
 <script>
+const WORKER_URL = 'https://cherrytag.org/api';
 (function () {
-  fetch('https://api.cherrytag.org/api/legal/config')
+  fetch(WORKER_URL+'/legal/config')
     .then(function (r) { return r.ok ? r.json() : Promise.reject(r.status); })
     .then(function (cfg) {
       document.querySelectorAll('[data-legal]').forEach(function (el) {

@@ -941,7 +941,7 @@
   <div class="modal">
     <div class="modal-handle"></div>
     <button class="modal-close" onclick="closeEarnModal()">✕</button>
-    <div class="modal-title">🍒 Earn Reward</div>
+    <div class="modal-title"> Earn Reward</div>
     <div class="modal-sub" id="earn-modal-sub">Claim your reward points</div>
 
     <div style="background:var(--bg);border-radius:14px;padding:18px;margin-bottom:20px;text-align:center;">
@@ -1088,7 +1088,7 @@ async function handleSignIn() {
 
   loginUser(data.user);
   closeAuthModal();
-  showToast('Welcome back! 🍒', 'success');
+  showToast('Welcome back! ', 'success');
 }
 
 // ═══ SIGN UP (via Worker) ══════════════════════════
@@ -1113,7 +1113,7 @@ async function handleSignUp() {
 
   loginUser(data.user);
   closeAuthModal();
-  showToast('Account created! Welcome to Cherry 🍒', 'success');
+  showToast('Account created! Welcome to Cherry ', 'success');
 }
 
 // ═══ FORGOT PIN ════════════════════════════════════
@@ -1808,7 +1808,7 @@ We will process your refund shortly.`,
 
   closePinModal();
   pendingRefund = null;
-  showToast('Refund claim submitted successfully! 🍒', 'success');
+  showToast('Refund claim submitted successfully! ', 'success');
 }
 
 document.addEventListener('DOMContentLoaded', async () => {
