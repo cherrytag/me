@@ -118,6 +118,26 @@
   }
   .btn-auth:hover { background: var(--cherry); color: #fff; }
 
+  /* ─── HEADER RESPONSIVE (small screens) ───── */
+  @media (max-width: 420px) {
+    header { padding: 0 12px; }
+    .header-actions { gap: 6px; }
+    .btn-subscribe {
+      padding: 7px 12px;
+      gap: 4px;
+    }
+    .btn-auth {
+      padding: 6px 10px;
+    }
+  }
+
+  @media (max-width: 360px) {
+    .logo-wordmark { display: none; }
+    .btn-subscribe span.subscribe-label { display: none; }
+    .btn-subscribe { padding: 8px; border-radius: 50%; }
+    .btn-subscribe svg { width: 16px; height: 16px; }
+  }
+
   /* ─── MAIN LAYOUT ─────────────────────────── */
   main {
     max-width: 480px;
