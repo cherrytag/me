@@ -917,6 +917,47 @@
         <button class="btn-secondary" onclick="closeForgotPinModal(); switchTab('signin');" style="margin-top: 20px;">Back to Sign In</button>
       </div>
     </div>
+
+    <div id="forgot-pin-notfound" style="display:none;">
+    <div style="text-align: center; padding: 20px 0;">
+      <div style="font-size: 48px; margin-bottom: 16px;">✕</div>
+      <div style="font-size: 15px; color: var(--ink); margin-bottom: 8px; font-weight: 600;">No account found</div>
+      <div style="font-size: 13px; color: var(--muted); line-height: 1.6;">We couldn't find a Cherry account with that email address. Check for typos, or cancel and try signing up instead.</div>
+      <button class="btn-secondary" onclick="closeForgotPinModal();" style="margin-top: 20px;">Cancel</button>
+    </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- ═══ SET NEW PIN MODAL ══════════════════════════ -->
+<div class="modal-overlay" id="set-new-pin-modal">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <button class="modal-close" onclick="closeSetNewPinModal()">✕</button>
+    <div class="modal-title">Set a New PIN</div>
+    <div class="modal-sub">Choose a new PIN for your Cherry account</div>
+
+    <div id="form-set-new-pin">
+      <div class="field">
+        <label>New PIN</label>
+        <input type="password" id="new-pin" placeholder="••••" maxlength="6">
+      </div>
+      <div class="field">
+        <label>Confirm New PIN</label>
+        <input type="password" id="new-pin-confirm" placeholder="••••" maxlength="6">
+      </div>
+      <button class="btn-primary" onclick="handleConfirmResetPin()">Set New PIN</button>
+    </div>
+
+    <div id="set-new-pin-success" style="display:none;">
+      <div style="text-align: center; padding: 20px 0;">
+        <div style="font-size: 48px; margin-bottom: 16px;">✓</div>
+        <div style="font-size: 15px; color: var(--ink); margin-bottom: 8px; font-weight: 600;">PIN updated!</div>
+        <div style="font-size: 13px; color: var(--muted); line-height: 1.6;">Your PIN has been reset. Sign in with your new PIN.</div>
+        <button class="btn-secondary" onclick="closeSetNewPinModal(); document.getElementById('auth-modal').classList.add('active'); switchTab('signin');" style="margin-top: 20px;">Back to Sign In</button>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -1168,6 +1209,7 @@ function openForgotPinModal() {
   document.getElementById('forgot-pin-modal').classList.add('active');
   document.getElementById('form-forgot-pin').style.display = 'block';
   document.getElementById('forgot-pin-success').style.display = 'none';
+  document.getElementById('forgot-pin-notfound').style.display = 'none';
   document.getElementById('forgot-pin-email').value = '';
 }
 
@@ -1175,6 +1217,7 @@ function closeForgotPinModal() {
   document.getElementById('forgot-pin-modal').classList.remove('active');
   document.getElementById('form-forgot-pin').style.display = 'block';
   document.getElementById('forgot-pin-success').style.display = 'none';
+  document.getElementById('forgot-pin-notfound').style.display = 'none';
 }
 
 document.getElementById('forgot-pin-modal').addEventListener('click', function(e) {
@@ -1183,13 +1226,25 @@ document.getElementById('forgot-pin-modal').addEventListener('click', function(e
 
 async function handleForgotPin() {
   const email = document.getElementById('forgot-pin-email').value.trim().toLowerCase();
-  
+
   if (!email) {
     showToast('Please enter your email address', 'error');
     return;
   }
 
-  // Send PIN reset request via Worker
+  const { ok: checkOk, data: checkData } = await workerPost('/auth/check-email', { email });
+
+  if (!checkOk) {
+    showToast(checkData.error || 'Something went wrong. Please try again.', 'error');
+    return;
+  }
+
+  if (!checkData.exists) {
+    document.getElementById('form-forgot-pin').style.display = 'none';
+    document.getElementById('forgot-pin-notfound').style.display = 'block';
+    return;
+  }
+
   const { ok, data } = await workerPost('/auth/reset-pin', { email });
 
   if (!ok) {
@@ -1197,11 +1252,66 @@ async function handleForgotPin() {
     return;
   }
 
-  // Show success message
   document.getElementById('form-forgot-pin').style.display = 'none';
   document.getElementById('forgot-pin-success').style.display = 'block';
   showToast('PIN reset link sent to your email! 📧', 'success');
 }
+
+let pendingResetEmail = null;
+let pendingResetToken = null;
+
+function openSetNewPinModal(email, token) {
+  pendingResetEmail = email;
+  pendingResetToken = token;
+  document.getElementById('form-set-new-pin').style.display = 'block';
+  document.getElementById('set-new-pin-success').style.display = 'none';
+  document.getElementById('new-pin').value = '';
+  document.getElementById('new-pin-confirm').value = '';
+  document.getElementById('set-new-pin-modal').classList.add('active');
+}
+
+function closeSetNewPinModal() {
+  document.getElementById('set-new-pin-modal').classList.remove('active');
+}
+
+document.getElementById('set-new-pin-modal').addEventListener('click', function(e) {
+  if (e.target === this) closeSetNewPinModal();
+});
+
+async function handleConfirmResetPin() {
+  const newPin     = document.getElementById('new-pin').value.trim();
+  const confirmPin = document.getElementById('new-pin-confirm').value.trim();
+
+  if (!newPin || newPin.length < 4) {
+    showToast('PIN must be at least 4 digits', 'error');
+    return;
+  }
+  if (newPin !== confirmPin) {
+    showToast('PINs do not match', 'error');
+    return;
+  }
+  if (!pendingResetEmail || !pendingResetToken) {
+    showToast('This reset link is missing information. Please use the link from your email again.', 'error');
+    return;
+  }
+
+  const { ok, data } = await workerPost('/auth/confirm-reset-pin', {
+    email: pendingResetEmail,
+    token: pendingResetToken,
+    newPin,
+  });
+
+  if (!ok) {
+    showToast(data.error || 'Failed to reset PIN. The link may have expired.', 'error');
+    return;
+  }
+
+  document.getElementById('form-set-new-pin').style.display = 'none';
+  document.getElementById('set-new-pin-success').style.display = 'block';
+  showToast('PIN updated successfully! 🎉', 'success');
+}
+
+
 
 // ═══ UPDATE REWARD DESC / REDEEMED LABEL ══════════
 function updateRewardDesc(user) {
@@ -1859,9 +1969,18 @@ We will process your refund shortly.`,
 
 document.addEventListener('DOMContentLoaded', async () => {
   await restoreSession();
-  if (!currentUser) {
+
+  const urlParams  = new URLSearchParams(window.location.search);
+  const resetToken = urlParams.get('resetToken');
+  const resetEmail = urlParams.get('email');
+
+  if (resetToken && resetEmail) {
+    window.history.replaceState({}, document.title, window.location.pathname);
+    openSetNewPinModal(resetEmail, resetToken);
+  } else if (!currentUser) {
     document.getElementById('auth-modal').classList.add('active');
   }
+
   requestLocationAndInitMap();
 });
 </script>
