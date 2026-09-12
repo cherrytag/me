@@ -1334,7 +1334,7 @@ function loginUser(user) {
   document.getElementById('user-display-email').textContent = user.email;
 
   document.getElementById('reward-pts').textContent   = user.fund1 ?? 0;
-  document.getElementById('reward-title').textContent = user.email || 'Cherry Member';
+  document.getElementById('reward-title').textContent = displayName || 'Cherry Member';
   updateRewardDesc(user);
 
   const emailName = user.email.split('@')[0];
